@@ -30,6 +30,8 @@ export class LiveManager {
     private outputLevelFrame: number | null = null;
     private callbacks: LiveManagerCallbacks;
     private isMuted: boolean = false;
+    private inputTranscription: string = "";
+    private outputTranscription: string = "";
 
     constructor(
         callbacks: LiveManagerCallbacks,
@@ -173,6 +175,28 @@ export class LiveManager {
             this.callbacks.onAgentState("listening");
         }
 
+        if(serverContent?.inputTranscription?.text) {
+            this.inputTranscription += serverContent.inputTranscription.text;
+            this.callbacks.onTranscript("user", serverContent.inputTranscription.text, true);
+        }
+
+        if(serverContent?.outputTranscription?.text) {
+            this.outputTranscription += serverContent.outputTranscription.text;
+            this.callbacks.onTranscript("model", serverContent.outputTranscription.text, true);
+        }
+        
+        if(serverContent?.turnComplete) {
+            if(this.inputTranscription) {
+                this.callbacks.onTranscript("user", this.inputTranscription, false);
+                this.inputTranscription = "";
+            }
+
+            if(this.outputTranscription) {
+                this.callbacks.onTranscript("model", this.outputTranscription, false);
+                this.outputTranscription = "";
+            }
+        }
+
         const base64Data = serverContent?.modelTurn?.parts?.[0].inlineData?.data;
 
         if (base64Data) {
@@ -190,6 +214,7 @@ export class LiveManager {
         } else if (serverContent.interactionStatus === InteractionStatus.IN_PROGRESS) {
             this.callbacks.onAgentState("thinking");
         }
+
 
     }
 

@@ -1,5 +1,5 @@
 import { LiveManager } from "@/services/liveManager";
-import { AgentState, AudioVolume, ConnectionState } from "@/types";
+import { AgentState, AudioVolume, ConnectionState, TranscriptItem } from "@/types";
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 
@@ -10,6 +10,7 @@ export type AudioStore = {
     audioLevel: AudioVolume;
     agentState: AgentState;
     liveManagerInstance: LiveManager | null;
+    transcript: TranscriptItem[];
     connect: () => void;
     disconnect: () => void;
     toggleMute: () => void;
@@ -26,6 +27,7 @@ export const useAudioStore = create<AudioStore>()(
             audioLevel: { input: 0, output: 0 },
             agentState: null,
             liveManagerInstance: null,
+            transcript: [],
             connect: async () => {
                 const state = get();
 
@@ -65,7 +67,32 @@ export const useAudioStore = create<AudioStore>()(
                                     ? "thinking"
                                     : null,
                         }),
-                        onTranscript: () => {},
+                        onTranscript: (sender, text, partial) => {
+                            const newTranscript = [...get().transcript];
+
+                            const existingIndex = newTranscript.findIndex(item => item.sender === sender && item.isPartial);
+
+                            // partioal message exists, update it
+                            if (existingIndex !== -1) {
+                                newTranscript[existingIndex] = {
+                                    ...newTranscript[existingIndex],
+                                    text,
+                                    isPartial: partial,
+                                };
+
+                                return { transcript: newTranscript };
+                            } else {
+                                if (text.trim() === "") return { transcript: newTranscript }; {
+                                    newTranscript.push({
+                                        id: `${sender}-${Date.now()}`,
+                                        sender,
+                                        text,
+                                        isPartial: partial,
+                                    });
+                                }
+                                return { transcript: newTranscript };
+                            }
+                        },
                         onAudioLevel: (level, type) => set((state) => ({
                             audioLevel: { ...state.audioLevel, [type]: level },
                         })),
