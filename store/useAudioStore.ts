@@ -46,8 +46,11 @@ export const useAudioStore = create<AudioStore>()(
                         set({ error: "Google API key is not configured" });
                         return;
                     }
-
-                    manager = new LiveManager(apiKey);
+                    // @ts-ignore
+                    manager = new LiveManager({
+                        onStateChange: (newState: ConnectionState) => set({ connectionState: newState }),
+                        onError: (error: string) => set({ error }),
+                    });
                     set({ liveManagerInstance: manager })
                 }
 

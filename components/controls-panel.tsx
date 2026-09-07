@@ -7,12 +7,13 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { MicSelector } from "@/components/ui/mic-selector";
 import { useAudioStore } from "@/store/useAudioStore";
+import { ConnectionState } from "@/types";
 
 function ControlsPanel() {
   const [selectedDevice, setSelectedDevice] = useState<string>("");
-  const {connect} = useAudioStore();
-  const isConnected = false;
-  const isConnecting = false;
+  const {connect, connectionState} = useAudioStore();
+  const isConnected = connectionState === ConnectionState.CONNECTED;
+  const isConnecting = connectionState === ConnectionState.CONNECTING;
   const isMuted = false;
 
 

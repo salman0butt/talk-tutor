@@ -12,6 +12,7 @@ import {
     Session,
 } from "@google/genai";
 import { base64ToUint8Array, createPCMBlob, decodeAudioData, } from "../lib/audioUtils";
+import { ConnectionState, LiveManagerCallbacks } from "@/types";
 export class LiveManager {
     private ai: GoogleGenAI;
     private activeSession: Session | null = null;
@@ -23,14 +24,17 @@ export class LiveManager {
     private inputSource: MediaStreamAudioSourceNode | null = null;
     private nextStartTime = 0;
     private sources = new Set<AudioBufferSourceNode>()
+    private callbacks: LiveManagerCallbacks;
 
     constructor(
+        callbacks: LiveManagerCallbacks,
         token: string,
     ) {
         this.ai = new GoogleGenAI({
             apiKey: token,
             apiVersion: "v1alpha",
         });
+        this.callbacks = callbacks;
 
     }
 
@@ -38,6 +42,7 @@ export class LiveManager {
         try {
             console.log("starting the session");
 
+            this.callbacks.onStateChange(ConnectionState.CONNECTING);
             const config: LiveConnectConfig = {
                 responseModalities: [Modality.AUDIO],
                 systemInstruction:
@@ -51,12 +56,12 @@ export class LiveManager {
                 config: config,
                 callbacks: {
                     onopen: () => {
-
+                        this.callbacks.onStateChange(ConnectionState.CONNECTED)
                     },
                     onmessage: this.handleMessage.bind(this),
                     onerror: (e) => {
-                        console.log(e);
-
+                        this.callbacks.onStateChange(ConnectionState.ERROR);
+                        this.callbacks.onError("Could not connect.")
                     },
                     // todo: handle this -> destroy strems, ...
                     onclose: (e) => console.log("Closed:", e.reason),
@@ -115,11 +120,11 @@ export class LiveManager {
 
             this.inputSource.connect(this.workletNode)
 
-
-
             console.log("Connected to Gemini Live");
         } catch (e) {
             console.error(e);
+            this.callbacks.onStateChange(ConnectionState.ERROR);
+            this.callbacks.onError("Something went wrong.")
         }
     }
 
@@ -133,7 +138,7 @@ export class LiveManager {
     handleMessage(message: LiveServerMessage) {
         const serverContent = message.serverContent;
 
-        if(serverContent?.interrupted) {
+        if (serverContent?.interrupted) {
             this.stopAllAudio();
         }
 
@@ -174,12 +179,12 @@ export class LiveManager {
         this.sources.forEach((source) => {
             try {
                 source.stop();
-            } catch {}
+            } catch { }
         });
 
         this.sources.clear();
 
-        if(this.outputAudioContext) {
+        if (this.outputAudioContext) {
             this.nextStartTime = this.outputAudioContext?.currentTime;
         }
 
