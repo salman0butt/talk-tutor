@@ -6,12 +6,14 @@ import {
 
 import {
     GoogleGenAI,
+    InteractionStatus,
     LiveConnectConfig,
     LiveServerMessage,
     Modality,
     Session,
+    VoiceActivityType,
 } from "@google/genai";
-import { base64ToUint8Array, createPCMBlob, decodeAudioData, } from "../lib/audioUtils";
+import { base64ToUint8Array, createPCMBlob, decodeAudioData, getAudioLevel, } from "../lib/audioUtils";
 import { ConnectionState, LiveManagerCallbacks } from "@/types";
 export class LiveManager {
     private ai: GoogleGenAI;
@@ -19,6 +21,7 @@ export class LiveManager {
     private inputAudioContext: AudioContext | null = null;
     private outputAudioContext: AudioContext | null = null;
     private outputNode: GainNode | null = null;
+    private outputAnalyser: AnalyserNode | null = null;
     private mediaStream: MediaStream | null = null;
     private workletNode: AudioWorkletNode | null = null;
     private inputSource: MediaStreamAudioSourceNode | null = null;
@@ -60,7 +63,7 @@ export class LiveManager {
                         this.callbacks.onStateChange(ConnectionState.CONNECTED)
                     },
                     onmessage: this.handleMessage.bind(this),
-                    onerror: (e) => {
+                    onerror: () => {
                         this.callbacks.onStateChange(ConnectionState.ERROR);
                         this.callbacks.onError("Could not connect.")
                     },
@@ -86,8 +89,12 @@ export class LiveManager {
             }
 
             this.outputNode = this.outputAudioContext.createGain();
-
-            this.outputNode.connect(this.outputAudioContext.destination);
+            this.outputAnalyser = this.outputAudioContext.createAnalyser();
+            this.outputAnalyser.fftSize = 256;
+            this.outputAnalyser.smoothingTimeConstant = 0.8;
+            this.outputNode.connect(this.outputAnalyser);
+            this.outputAnalyser.connect(this.outputAudioContext.destination);
+            this.monitorOutputLevel();
 
             await this.inputAudioContext.audioWorklet.addModule(
                 "/worklet/mic-processor.js"
@@ -99,10 +106,19 @@ export class LiveManager {
             );
 
             this.workletNode.port.onmessage = (event) => {
-                const pcbBlob = createPCMBlob(
-                    event.data as Float32Array
-                );
-                console.log(pcbBlob)
+                const samples = event.data as Float32Array;
+                const level = this.isMuted ? 0 : getAudioLevel(samples);
+                this.callbacks.onAudioLevel(level, "input");
+
+                if (this.isMuted || !this.activeSession) return;
+
+                this.activeSession.sendRealtimeInput({
+                    audio: createPCMBlob(samples),
+                });
+
+                if (level > 0.05) {
+                    this.callbacks.onAgentState("listening");
+                }
             }
 
             this.mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -138,16 +154,39 @@ export class LiveManager {
 
     handleMessage(message: LiveServerMessage) {
         const serverContent = message.serverContent;
+        const voiceActivity = message.voiceActivity?.voiceActivityType;
+
+        if (!serverContent) {
+            if (voiceActivity === VoiceActivityType.ACTIVITY_START) {
+                this.callbacks.onAgentState("listening");
+            } else if (voiceActivity === VoiceActivityType.ACTIVITY_END) {
+                this.callbacks.onAgentState("thinking");
+            }
+            return;
+        }
 
         if (serverContent?.interrupted) {
             this.stopAllAudio();
+            this.callbacks.onAgentState("listening");
         }
 
         const base64Data = serverContent?.modelTurn?.parts?.[0].inlineData?.data;
 
-        if (!base64Data) return;
+        if (base64Data) {
+            this.callbacks.onAgentState("talking");
+            void this.playAudioChunk(base64Data);
+            return;
+        }
 
-        this.playAudioChunk(base64Data as string);
+        if (voiceActivity === VoiceActivityType.ACTIVITY_START) {
+            this.callbacks.onAgentState("listening");
+        } else if (voiceActivity === VoiceActivityType.ACTIVITY_END) {
+            this.callbacks.onAgentState("thinking");
+        } else if (serverContent.turnComplete || serverContent.waitingForInput) {
+            this.callbacks.onAgentState("listening");
+        } else if (serverContent.interactionStatus === InteractionStatus.IN_PROGRESS) {
+            this.callbacks.onAgentState("thinking");
+        }
 
     }
 
@@ -171,6 +210,9 @@ export class LiveManager {
 
         source.addEventListener('ended', () => {
             this.sources.delete(source);
+            if (!this.sources.size) {
+                this.callbacks.onAgentState("listening");
+            }
         })
 
         this.sources.add(source);
@@ -184,6 +226,7 @@ export class LiveManager {
         });
 
         this.sources.clear();
+        this.callbacks.onAudioLevel(0, "output");
 
         if (this.outputAudioContext) {
             this.nextStartTime = this.outputAudioContext?.currentTime;
@@ -202,6 +245,21 @@ export class LiveManager {
         if(isMuted) {
             this.callbacks.onAudioLevel(0, "input");
         }
+    }
+
+    private monitorOutputLevel() {
+        if (!this.outputAnalyser) return;
+
+        const samples = new Float32Array(this.outputAnalyser.fftSize);
+        const update = () => {
+            if (!this.outputAnalyser) return;
+
+            this.outputAnalyser.getFloatTimeDomainData(samples);
+            this.callbacks.onAudioLevel(getAudioLevel(samples), "output");
+            requestAnimationFrame(update);
+        };
+
+        update();
     }
 
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Loader2, Mic, MicOff, PhoneOff } from "lucide-react";
 
 import { cn } from "@/lib/utils";

@@ -5,6 +5,8 @@ export enum ConnectionState {
   ERROR = 'ERROR',
 }
 
+export type AgentState = "thinking" | "listening" | "talking" | null;
+
 export interface TranscriptItem {
   id: string;
   sender: 'user' | 'model';
@@ -26,6 +28,7 @@ export interface LiveManagerCallbacks {
     isPartial: boolean
   ) => void;
   onAudioLevel: (level: number, type: "input" | "output") => void;
+  onAgentState: (state: AgentState) => void;
   onError: (error: string) => void;
 }
 

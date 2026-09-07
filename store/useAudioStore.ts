@@ -1,5 +1,5 @@
 import { LiveManager } from "@/services/liveManager";
-import { ConnectionState } from "@/types";
+import { AgentState, AudioVolume, ConnectionState } from "@/types";
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 
@@ -7,6 +7,8 @@ export type AudioStore = {
     connectionState: ConnectionState;
     error: string | null;
     isMuted: boolean;
+    audioLevel: AudioVolume;
+    agentState: AgentState;
     liveManagerInstance: LiveManager | null;
     connect: () => void;
     toggleMute: () => void;
@@ -20,6 +22,8 @@ export const useAudioStore = create<AudioStore>()(
             connectionState: ConnectionState.DISCONNECTED,
             error: null,
             isMuted: false,
+            audioLevel: { input: 0, output: 0 },
+            agentState: null,
             liveManagerInstance: null,
             connect: async () => {
                 const state = get();
@@ -32,12 +36,14 @@ export const useAudioStore = create<AudioStore>()(
 
                 // Check Permission
                 try {
-                    await navigator.mediaDevices.getUserMedia({
+                    const permissionStream = await navigator.mediaDevices.getUserMedia({
                         audio: true,
                         video: false
                     });
+                    permissionStream.getTracks().forEach((track) => track.stop());
                 } catch {
                     set({ error: "Microphone permission denined" });
+                    return;
                 }
 
                 let manager = state.liveManagerInstance;
@@ -49,11 +55,22 @@ export const useAudioStore = create<AudioStore>()(
                         set({ error: "Google API key is not configured" });
                         return;
                     }
-                    // @ts-ignore
                     manager = new LiveManager({
-                        onStateChange: (newState: ConnectionState) => set({ connectionState: newState }),
+                        onStateChange: (newState: ConnectionState) => set({
+                            connectionState: newState,
+                            agentState: newState === ConnectionState.CONNECTED
+                                ? "listening"
+                                : newState === ConnectionState.CONNECTING
+                                    ? "thinking"
+                                    : null,
+                        }),
+                        onTranscript: () => {},
+                        onAudioLevel: (level, type) => set((state) => ({
+                            audioLevel: { ...state.audioLevel, [type]: level },
+                        })),
+                        onAgentState: (agentState) => set({ agentState }),
                         onError: (error: string) => set({ error }),
-                    });
+                    }, apiKey);
                     set({ liveManagerInstance: manager })
                 }
 

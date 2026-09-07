@@ -19,6 +19,17 @@ export function createPCMBlob(data: Float32Array) {
   };
 }
 
+export function getAudioLevel(samples: ArrayLike<number>) {
+  if (!samples.length) return 0;
+
+  let sum = 0;
+  for (let i = 0; i < samples.length; i++) {
+    sum += samples[i] * samples[i];
+  }
+
+  return Math.min(1, Math.sqrt(sum / samples.length) * 4);
+}
+
 function arrayBufferToBase64(data: Int16Array) {
   const bytes = new Uint8Array(data.buffer);
 
