@@ -11,6 +11,7 @@ export type AudioStore = {
     agentState: AgentState;
     liveManagerInstance: LiveManager | null;
     connect: () => void;
+    disconnect: () => void;
     toggleMute: () => void;
 
 };
@@ -78,6 +79,18 @@ export const useAudioStore = create<AudioStore>()(
                 // Create Live manager
 
                 manager.startSession();
+            },
+            disconnect: async () => {
+                const manager = get().liveManagerInstance;
+                if (!manager) return;
+
+                await manager.disconnect();
+                set({
+                    connectionState: ConnectionState.DISCONNECTED,
+                    isMuted: false,
+                    audioLevel: { input: 0, output: 0 },
+                    agentState: null,
+                });
             },
             toggleMute: () => {
                 const state = get();

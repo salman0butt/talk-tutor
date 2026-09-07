@@ -27,6 +27,7 @@ export class LiveManager {
     private inputSource: MediaStreamAudioSourceNode | null = null;
     private nextStartTime = 0;
     private sources = new Set<AudioBufferSourceNode>()
+    private outputLevelFrame: number | null = null;
     private callbacks: LiveManagerCallbacks;
     private isMuted: boolean = false;
 
@@ -106,6 +107,8 @@ export class LiveManager {
             );
 
             this.workletNode.port.onmessage = (event) => {
+                if (!this.activeSession) return;
+
                 const samples = event.data as Float32Array;
                 const level = this.isMuted ? 0 : getAudioLevel(samples);
                 this.callbacks.onAudioLevel(level, "input");
@@ -210,7 +213,7 @@ export class LiveManager {
 
         source.addEventListener('ended', () => {
             this.sources.delete(source);
-            if (!this.sources.size) {
+            if (this.activeSession && !this.sources.size) {
                 this.callbacks.onAgentState("listening");
             }
         })
@@ -247,6 +250,43 @@ export class LiveManager {
         }
     }
 
+    async disconnect() {
+        this.activeSession?.close();
+        this.activeSession = null;
+
+        if (this.outputLevelFrame !== null) {
+            cancelAnimationFrame(this.outputLevelFrame);
+            this.outputLevelFrame = null;
+        }
+
+        await this.stopAllAudio();
+
+        this.inputSource?.disconnect();
+        this.workletNode?.disconnect();
+        this.mediaStream?.getTracks().forEach((track) => track.stop());
+        this.outputNode?.disconnect();
+        this.outputAnalyser?.disconnect();
+
+        await Promise.all([
+            this.inputAudioContext?.close(),
+            this.outputAudioContext?.close(),
+        ]);
+
+        this.inputSource = null;
+        this.workletNode = null;
+        this.mediaStream = null;
+        this.inputAudioContext = null;
+        this.outputAudioContext = null;
+        this.outputNode = null;
+        this.outputAnalyser = null;
+        this.nextStartTime = 0;
+        this.isMuted = false;
+
+        this.callbacks.onAudioLevel(0, "input");
+        this.callbacks.onAgentState(null);
+        this.callbacks.onStateChange(ConnectionState.DISCONNECTED);
+    }
+
     private monitorOutputLevel() {
         if (!this.outputAnalyser) return;
 
@@ -256,7 +296,7 @@ export class LiveManager {
 
             this.outputAnalyser.getFloatTimeDomainData(samples);
             this.callbacks.onAudioLevel(getAudioLevel(samples), "output");
-            requestAnimationFrame(update);
+            this.outputLevelFrame = requestAnimationFrame(update);
         };
 
         update();
