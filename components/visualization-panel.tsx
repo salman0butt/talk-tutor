@@ -51,7 +51,7 @@ function VisualizationPanel() {
       </div>
 
       <div className="h-24 w-full max-w-xs sm:max-w-md flex items-center justify-center mt-8 opacity-80 z-10">
-        {/* <LiveWaveform
+        <LiveWaveform
           active={isConnected}
           processing={isConnecting}
           mode="static"
@@ -60,7 +60,7 @@ function VisualizationPanel() {
           barGap={4}
           height={80}
           fadeEdges={true}
-        /> */}
+        />
       </div>
     </div>
   );

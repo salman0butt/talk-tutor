@@ -6,8 +6,10 @@ import { devtools } from "zustand/middleware";
 export type AudioStore = {
     connectionState: ConnectionState;
     error: string | null;
+    isMuted: boolean;
     liveManagerInstance: LiveManager | null;
     connect: () => void;
+    toggleMute: () => void;
 
 };
 
@@ -17,6 +19,7 @@ export const useAudioStore = create<AudioStore>()(
         (set, get) => ({
             connectionState: ConnectionState.DISCONNECTED,
             error: null,
+            isMuted: false,
             liveManagerInstance: null,
             connect: async () => {
                 const state = get();
@@ -58,6 +61,12 @@ export const useAudioStore = create<AudioStore>()(
                 // Create Live manager
 
                 manager.startSession();
+            },
+            toggleMute: () => {
+                const state = get();
+                const newMuteState = !state.isMuted;
+                set({ isMuted: newMuteState });
+                state.liveManagerInstance?.setMute(newMuteState);
             }
 
         }),

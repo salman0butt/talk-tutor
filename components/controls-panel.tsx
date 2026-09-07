@@ -11,11 +11,9 @@ import { ConnectionState } from "@/types";
 
 function ControlsPanel() {
   const [selectedDevice, setSelectedDevice] = useState<string>("");
-  const {connect, connectionState} = useAudioStore();
+  const {connect, connectionState, isMuted, toggleMute} = useAudioStore();
   const isConnected = connectionState === ConnectionState.CONNECTED;
   const isConnecting = connectionState === ConnectionState.CONNECTING;
-  const isMuted = false;
-
 
 
   return (
@@ -51,9 +49,7 @@ function ControlsPanel() {
           {/* 1. MUTE BUTTON (Visible only when Connected) */}
           {isConnected && (
             <Button
-              onClick={()=>{
-
-              }}
+              onClick={toggleMute}
               variant={"secondary"}
               size="icon"
               className={cn(

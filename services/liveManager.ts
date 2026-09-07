@@ -25,6 +25,7 @@ export class LiveManager {
     private nextStartTime = 0;
     private sources = new Set<AudioBufferSourceNode>()
     private callbacks: LiveManagerCallbacks;
+    private isMuted: boolean = false;
 
     constructor(
         callbacks: LiveManagerCallbacks,
@@ -187,9 +188,20 @@ export class LiveManager {
         if (this.outputAudioContext) {
             this.nextStartTime = this.outputAudioContext?.currentTime;
         }
+    }
 
+    setMute(isMuted: boolean) {
+        this.isMuted = isMuted;
 
+        if(this.mediaStream) {
+            this.mediaStream.getAudioTracks().forEach(track => {
+                track.enabled = !isMuted;
+            });
+        }
 
+        if(isMuted) {
+            this.callbacks.onAudioLevel(0, "input");
+        }
     }
 
 }
