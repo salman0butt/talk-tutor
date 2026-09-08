@@ -12,44 +12,49 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
-const TITLE = "Talk Tutor";
-const DESCRIPTION = "Learn languages by speaking";
-const BASE_URL = "https://talk-tutor.vercel.app";
+
+const TITLE = "Talk Tutor — Learn Languages by Speaking";
+const DESCRIPTION =
+  "Practice real conversations with an AI language tutor that adapts to your language, proficiency, topic, and preferred voice.";
+const BASE_URL =
+  process.env.NEXT_PUBLIC_APP_URL ?? "https://talk-tutor.vercel.app";
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
-  title: TITLE,
+  title: {
+    default: TITLE,
+    template: "%s | Talk Tutor",
+  },
   description: DESCRIPTION,
-  keywords: "talk tutor,language learning,ai tutor",
-  authors: [
-    {
-      name: "codersgyan",
-      url: BASE_URL,
-    },
+  keywords: [
+    "AI language tutor",
+    "language speaking practice",
+    "AI conversation practice",
+    "learn languages",
+    "Talk Tutor",
   ],
-  creator: "codersgyan",
+  authors: [{ name: "Talk Tutor", url: BASE_URL }],
+  creator: "Talk Tutor",
   openGraph: {
     type: "website",
     locale: "en_US",
     url: BASE_URL,
     title: TITLE,
     description: DESCRIPTION,
-    siteName: TITLE,
+    siteName: "Talk Tutor",
     images: [
       {
         url: `${BASE_URL}/og.jpg`,
         width: 1200,
         height: 630,
-        alt: TITLE,
+        alt: "Talk Tutor",
       },
     ],
   },
-
   twitter: {
     card: "summary_large_image",
     title: TITLE,
     description: DESCRIPTION,
-    creator: "@codersgyan",
     images: [`${BASE_URL}/og.jpg`],
   },
   icons: {
@@ -67,13 +72,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
-          disableTransitionOnChange>
+          disableTransitionOnChange
+        >
           {children}
         </ThemeProvider>
       </body>

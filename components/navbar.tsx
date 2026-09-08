@@ -1,10 +1,14 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 import LeftSidebar from "@/components/left-sidebar";
 import RightSidebar from "@/components/right-sidebar";
 
-import { LucideLanguages, Settings2 } from "lucide-react";
+import { LoaderCircle, LogOut, LucideLanguages, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 import {
@@ -16,11 +20,25 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
-export function Navbar() {
+export function Navbar({ userEmail }: { userEmail?: string }) {
+  const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function signOut() {
+    setSigningOut(true);
+
+    try {
+      await fetch("/api/auth/signout", { method: "POST" });
+    } finally {
+      router.replace("/");
+      router.refresh();
+      setSigningOut(false);
+    }
+  }
+
   return (
-    <header className="relative z-50 w-full border-b">
+    <header className="relative z-50 w-full border-b bg-background/90 backdrop-blur">
       <div className="relative flex h-16 items-center px-4 md:px-6">
-        {/* LEFT: Config */}
         <div className="flex items-center">
           <div className="lg:hidden">
             <Sheet>
@@ -33,9 +51,7 @@ export function Navbar() {
               <SheetContent side="left">
                 <SheetHeader className="sr-only">
                   <SheetTitle>Configuration</SheetTitle>
-                  <SheetDescription>
-                    Set your app configuration
-                  </SheetDescription>
+                  <SheetDescription>Set your app configuration</SheetDescription>
                 </SheetHeader>
                 <LeftSidebar />
               </SheetContent>
@@ -43,10 +59,9 @@ export function Navbar() {
           </div>
         </div>
 
-        {/* CENTER: Logo (Larger) */}
         <Link
           href="/"
-          className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3"
+          className="absolute left-1/2 flex -translate-x-1/2 items-center gap-3"
         >
           <div className="relative h-11 w-11 overflow-hidden rounded-md">
             <Image
@@ -59,13 +74,12 @@ export function Navbar() {
             />
           </div>
 
-          <span className="text-lg md:text-xl font-semibold tracking-tight">
+          <span className="hidden text-lg font-semibold tracking-tight sm:inline md:text-xl">
             Talk <span className="text-primary">Tutor</span>
           </span>
         </Link>
 
-        {/* RIGHT: Transcript */}
-        <div className="ml-auto flex items-center">
+        <div className="ml-auto flex items-center gap-1.5">
           <div className="lg:hidden">
             <Sheet>
               <SheetTrigger asChild>
@@ -77,14 +91,34 @@ export function Navbar() {
               <SheetContent side="right">
                 <SheetHeader className="sr-only">
                   <SheetTitle>Transcript</SheetTitle>
-                  <SheetDescription>
-                    Voice conversation transcript
-                  </SheetDescription>
+                  <SheetDescription>Voice conversation transcript</SheetDescription>
                 </SheetHeader>
                 <RightSidebar />
               </SheetContent>
             </Sheet>
           </div>
+
+          {userEmail && (
+            <span className="hidden max-w-44 truncate text-xs text-muted-foreground xl:inline">
+              {userEmail}
+            </span>
+          )}
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9"
+            onClick={signOut}
+            disabled={signingOut}
+          >
+            {signingOut ? (
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+            ) : (
+              <LogOut className="h-4 w-4" />
+            )}
+            <span className="sr-only">Sign out</span>
+          </Button>
         </div>
       </div>
     </header>
