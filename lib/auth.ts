@@ -32,6 +32,11 @@ export function isAuthConfigured() {
   return Boolean(authConfig());
 }
 
+export async function getCurrentAccessToken(): Promise<string | null> {
+  const cookieStore = await cookies();
+  return cookieStore.get(ACCESS_COOKIE)?.value ?? null;
+}
+
 export async function supabaseAuthFetch(
   path: string,
   init: RequestInit = {},
@@ -60,8 +65,7 @@ export async function supabaseAuthFetch(
 export async function getCurrentUser(): Promise<AuthUser | null> {
   if (!isAuthConfigured()) return null;
 
-  const cookieStore = await cookies();
-  const accessToken = cookieStore.get(ACCESS_COOKIE)?.value;
+  const accessToken = await getCurrentAccessToken();
 
   if (!accessToken) return null;
 
