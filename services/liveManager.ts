@@ -75,10 +75,13 @@ export class LiveManager {
                     onmessage: this.handleMessage.bind(this),
                     onerror: () => {
                         this.callbacks.onStateChange(ConnectionState.ERROR);
-                        this.callbacks.onError("Could not connect.")
+                        this.callbacks.onError("Could not connect.");
+                        this.callbacks.onSessionClosed?.("connection error");
                     },
-                    // todo: handle this -> destroy strems, ...
-                    onclose: (e) => console.log("Closed:", e.reason),
+                    onclose: (event) => {
+                        this.callbacks.onStateChange(ConnectionState.DISCONNECTED);
+                        this.callbacks.onSessionClosed?.(event.reason);
+                    },
                 },
             });
 
@@ -161,7 +164,7 @@ export class LiveManager {
 
   generateSystemPrompt(config: ConnectConfig) {
     return `
-    ROLE: You are an expert language tutor, Your name is "TalkWalk".
+    ROLE: You are an expert language tutor. Your name is "Talk Tutor".
 
     GOAL: Help the user improve their proficiency in ${config.selected_launguage_name} (${config.selected_launguage_region}).
     TOPIC: ${config.selected_topic}.
