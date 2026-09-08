@@ -54,8 +54,8 @@ function VisualizationPanel() {
 
       <div className="h-24 w-full max-w-xs sm:max-w-md flex items-center justify-center mt-8 opacity-80 z-10">
         <LiveWaveform
-          active={isConnected}
-          processing={isConnecting}
+          active={false}
+          processing={isConnected || isConnecting}
           mode="static"
           barColor={"#ffa809"}
           barWidth={4}

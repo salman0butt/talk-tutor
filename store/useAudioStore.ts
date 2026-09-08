@@ -102,18 +102,19 @@ export const useAudioStore = create<AudioStore>()(
                                     isPartial: partial,
                                 };
 
-                                return { transcript: newTranscript };
-                            } else {
-                                if (text.trim() === "") return { transcript: newTranscript }; {
-                                    newTranscript.push({
-                                        id: `${sender}-${Date.now()}`,
-                                        sender,
-                                        text,
-                                        isPartial: partial,
-                                    });
-                                }
-                                return { transcript: newTranscript };
+                                set({ transcript: newTranscript });
+                                return;
                             }
+
+                            if (text.trim() === "") return;
+
+                            newTranscript.push({
+                                id: `${sender}-${Date.now()}`,
+                                sender,
+                                text,
+                                isPartial: partial,
+                            });
+                            set({ transcript: newTranscript });
                         },
                         onAudioLevel: (level, type) => set((state) => ({
                             audioLevel: { ...state.audioLevel, [type]: level },
