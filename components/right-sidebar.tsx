@@ -80,7 +80,7 @@ function RightSidebar() {
                     </MessageContent>
 
                     {!isUser && (
-                      <MessageAvatar src="/logo.png" name="Talk Tutor" />
+                      <MessageAvatar src="/logo-tutor.png" name="Talk Tutor" />
                     )}
                   </Message>
                 );

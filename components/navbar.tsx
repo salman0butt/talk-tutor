@@ -50,7 +50,7 @@ export function Navbar() {
         >
           <div className="relative h-11 w-11 overflow-hidden rounded-md">
             <Image
-              src="/logo.png"
+              src="/logo-tutor.png"
               alt="Talk Tutor"
               fill
               sizes="44px"

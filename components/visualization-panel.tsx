@@ -39,12 +39,12 @@ function VisualizationPanel() {
               transform: `scale(${logoScale})`,
             }}
           >
-            {/* Replace /logo.png with your actual path */}
+            {/* Center Tutor logo */}
             {/* Using standard img tag for simplicity, or use Next/Image */}
             <Image
               height={500}
               width={500}
-              src="/logo.png"
+              src="/logo-tutor.png"
               alt="Agent Logo"
               className="w-full h-full object-cover"
             />
