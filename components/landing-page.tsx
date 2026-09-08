@@ -503,12 +503,20 @@ export function LandingPage({ isAuthenticated }: { isAuthenticated: boolean }) {
             Speak more. Hesitate less. Keep going.
           </p>
           <div className="flex gap-5 text-xs text-white/35">
-            <Link href="/login" className="transition hover:text-white">
-              Sign in
-            </Link>
-            <Link href="/signup" className="transition hover:text-white">
-              Create account
-            </Link>
+            {isAuthenticated ? (
+              <Link href="/tutor" className="transition hover:text-white">
+                Open tutor
+              </Link>
+            ) : (
+              <>
+                <Link href="/login" className="transition hover:text-white">
+                  Sign in
+                </Link>
+                <Link href="/signup" className="transition hover:text-white">
+                  Create account
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </footer>
