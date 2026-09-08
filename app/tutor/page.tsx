@@ -6,6 +6,8 @@ import StatusPanel from "@/components/status-panel";
 import ControlsPanel from "@/components/controls-panel";
 import VisualizationPanel from "@/components/visualization-panel";
 import { getCurrentUser } from "@/lib/auth";
+import { getOrCreateLearningProfile } from "@/lib/learning/server";
+import { ProfileHydrator } from "@/components/learning/profile-hydrator";
 
 export default async function TutorPage() {
   const user = await getCurrentUser();
@@ -14,8 +16,15 @@ export default async function TutorPage() {
     redirect("/login?next=/tutor");
   }
 
+  const profile = await getOrCreateLearningProfile();
+
   return (
     <div className="flex h-dvh w-full flex-col overflow-hidden">
+      <ProfileHydrator
+        preferredLanguage={profile.preferredLanguage}
+        proficiencyLevel={profile.proficiencyLevel}
+        preferredVoice={profile.preferredVoice}
+      />
       <Navbar userEmail={user.email} />
 
       <div className="relative flex flex-1 overflow-hidden">
