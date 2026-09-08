@@ -1,4 +1,4 @@
-import { AVAILABLE_LANGUAGES, AVAILABLE_PROFICIENCY_LEVELS, AVAILABLE_VOICES } from "@/lib/constants";
+import { AVAILABLE_LANGUAGES, AVAILABLE_PROFICIENCY_LEVELS, AVAILABLE_VOICES, DEFAULT_CONFIGURATION } from "@/lib/constants";
 import { LiveManager } from "@/services/liveManager";
 import { AgentState, AudioVolume, ConnectionState, TranscriptItem } from "@/types";
 import { create } from "zustand";
@@ -37,10 +37,7 @@ export const useAudioStore = create<AudioStore>()(
             agentState: null,
             liveManagerInstance: null,
             transcript: [],
-            selectedLanguage: AVAILABLE_LANGUAGES[0].code,
-            selectedTopic: AVAILABLE_PROFICIENCY_LEVELS[0].label,
-            selectedAssistantVoice: AVAILABLE_VOICES[0].id,
-            selectedProficiencyLevel: AVAILABLE_PROFICIENCY_LEVELS[0].id,
+            ...DEFAULT_CONFIGURATION,
             setSelectedLanguage: (language) => set({ selectedLanguage: language }),
             setSelectedTopic: (topic) => set({ selectedTopic: topic }),
             setselectedAssistantVoice: (voice) => set({ selectedAssistantVoice: voice }),

@@ -53,3 +53,10 @@ export const AVAILABLE_PROFICIENCY_LEVELS = [
     description: "I can discuss most topics in detail",
   },
 ];
+
+export const DEFAULT_CONFIGURATION = {
+  selectedLanguage: AVAILABLE_LANGUAGES[0].code,
+  selectedTopic: AVAILABLE_TOPICS[0],
+  selectedAssistantVoice: AVAILABLE_VOICES[0].name,
+  selectedProficiencyLevel: AVAILABLE_PROFICIENCY_LEVELS[0].label,
+};
