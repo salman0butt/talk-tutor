@@ -5,7 +5,7 @@ import { CheckCircle2, Languages, Mic2, Sparkles } from "lucide-react";
 const benefits = [
   "Real-time speaking practice",
   "Adaptive conversations for your level",
-  "Instant transcript and feedback",
+  "Live transcript while you speak",
 ];
 
 export function AuthShell({ children }: { children: React.ReactNode }) {
