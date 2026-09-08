@@ -48,6 +48,20 @@ export const useAudioStore = create<AudioStore>()(
             connect: async () => {
                 const state = get();
 
+                const response = await fetch("/api/token");
+                if (!response.ok) {
+                    set({ error: "Failed to fetch token" });
+                    return;
+                }
+
+                const data = await response.json();
+                const token = data.token;
+
+                if (!token) {
+                    set({ error: "Token is missing in the response" });
+                    return;
+                }
+
                 if (state.connectionState === ConnectionState.CONNECTING || state.connectionState === ConnectionState.CONNECTED) {
                     return
                 }
@@ -69,12 +83,6 @@ export const useAudioStore = create<AudioStore>()(
                 let manager = state.liveManagerInstance;
 
                 if (!manager) {
-                    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
-
-                    if (!apiKey) {
-                        set({ error: "Google API key is not configured" });
-                        return;
-                    }
                     manager = new LiveManager({
                         onStateChange: (newState: ConnectionState) => set({
                             connectionState: newState,
@@ -115,7 +123,7 @@ export const useAudioStore = create<AudioStore>()(
                         })),
                         onAgentState: (agentState) => set({ agentState }),
                         onError: (error: string) => set({ error }),
-                    }, apiKey);
+                    }, token.name);
                     set({ liveManagerInstance: manager })
                 }
 
