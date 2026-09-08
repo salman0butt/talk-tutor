@@ -4,6 +4,8 @@ import {
     AVAILABLE_VOICES,
     DEFAULT_CONFIGURATION,
 } from "@/lib/constants";
+import { browserLearningSessionApi } from "@/lib/learning/session-api";
+import { LearningSessionRecorder } from "@/lib/learning/session-recorder";
 import { LiveManager } from "@/services/liveManager";
 import { AgentState, AudioVolume, ConnectionState, TranscriptItem } from "@/types";
 import { create } from "zustand";
@@ -20,10 +22,12 @@ export type AudioStore = {
     error: string | null;
     preferenceError: string | null;
     preferencesSaving: boolean;
+    sessionPersistenceError: string | null;
     isMuted: boolean;
     audioLevel: AudioVolume;
     agentState: AgentState;
     liveManagerInstance: LiveManager | null;
+    sessionRecorder: LearningSessionRecorder | null;
     transcript: TranscriptItem[];
     selectedLanguage: string;
     selectedTopic: string;
@@ -70,15 +74,26 @@ export const useAudioStore = create<AudioStore>()(
                 }
             };
 
+            const reportSessionPersistenceError = (reason: unknown) => {
+                set({
+                    sessionPersistenceError:
+                        reason instanceof Error
+                            ? reason.message
+                            : "Practice history could not be saved.",
+                });
+            };
+
             return {
                 connectionState: ConnectionState.DISCONNECTED,
                 error: null,
                 preferenceError: null,
                 preferencesSaving: false,
+                sessionPersistenceError: null,
                 isMuted: false,
                 audioLevel: { input: 0, output: 0 },
                 agentState: null,
                 liveManagerInstance: null,
+                sessionRecorder: null,
                 transcript: [],
                 ...DEFAULT_CONFIGURATION,
                 hydratePreferences: (preferences) =>
@@ -103,6 +118,18 @@ export const useAudioStore = create<AudioStore>()(
                 },
                 connect: async () => {
                     const state = get();
+                    if (
+                        state.connectionState === ConnectionState.CONNECTING ||
+                        state.connectionState === ConnectionState.CONNECTED
+                    ) {
+                        return;
+                    }
+
+                    set({
+                        error: null,
+                        sessionPersistenceError: null,
+                        transcript: [],
+                    });
 
                     const response = await fetch("/api/token");
                     if (!response.ok) {
@@ -112,20 +139,10 @@ export const useAudioStore = create<AudioStore>()(
 
                     const data = await response.json();
                     const token = data.token;
-
                     if (!token) {
                         set({ error: "Token is missing in the response" });
                         return;
                     }
-
-                    if (
-                        state.connectionState === ConnectionState.CONNECTING ||
-                        state.connectionState === ConnectionState.CONNECTED
-                    ) {
-                        return;
-                    }
-
-                    set({ error: null });
 
                     try {
                         const permissionStream = await navigator.mediaDevices.getUserMedia({
@@ -138,8 +155,33 @@ export const useAudioStore = create<AudioStore>()(
                         return;
                     }
 
-                    let manager = state.liveManagerInstance;
+                    const language =
+                        AVAILABLE_LANGUAGES.find(
+                            ({ code }) => code === state.selectedLanguage,
+                        ) ?? AVAILABLE_LANGUAGES[0];
+                    const proficiency =
+                        AVAILABLE_PROFICIENCY_LEVELS.find(
+                            ({ id, label }) =>
+                                id === state.selectedProficiencyLevel ||
+                                label === state.selectedProficiencyLevel,
+                        ) ?? AVAILABLE_PROFICIENCY_LEVELS[0];
+                    const voice =
+                        AVAILABLE_VOICES.find(
+                            ({ id, name }) =>
+                                id === state.selectedAssistantVoice ||
+                                name === state.selectedAssistantVoice,
+                        )?.name ?? state.selectedAssistantVoice;
 
+                    const recorder = new LearningSessionRecorder(browserLearningSessionApi);
+                    recorder.begin({
+                        language: language.code,
+                        proficiencyLevel: proficiency.label,
+                        topic: state.selectedTopic,
+                        assistantVoice: voice,
+                    });
+                    set({ sessionRecorder: recorder });
+
+                    let manager = state.liveManagerInstance;
                     if (!manager) {
                         manager = new LiveManager(
                             {
@@ -165,19 +207,26 @@ export const useAudioStore = create<AudioStore>()(
                                             text,
                                             isPartial: partial,
                                         };
-                                        set({ transcript: newTranscript });
-                                        return;
+                                    } else if (text.trim() !== "") {
+                                        newTranscript.push({
+                                            id: `${sender}-${Date.now()}`,
+                                            sender,
+                                            text,
+                                            isPartial: partial,
+                                        });
                                     }
-
-                                    if (text.trim() === "") return;
-
-                                    newTranscript.push({
-                                        id: `${sender}-${Date.now()}`,
-                                        sender,
-                                        text,
-                                        isPartial: partial,
-                                    });
                                     set({ transcript: newTranscript });
+
+                                    if (!partial && text.trim()) {
+                                        const role = sender === "model" ? "assistant" : "user";
+                                        void get()
+                                            .sessionRecorder?.recordFinalTurn(
+                                                role,
+                                                text,
+                                                new Date().toISOString(),
+                                            )
+                                            .catch(reportSessionPersistenceError);
+                                    }
                                 },
                                 onAudioLevel: (level, type) =>
                                     set((current) => ({
@@ -185,30 +234,21 @@ export const useAudioStore = create<AudioStore>()(
                                     })),
                                 onAgentState: (agentState) => set({ agentState }),
                                 onError: (error: string) => set({ error }),
+                                onSessionClosed: () => {
+                                    const activeRecorder = get().sessionRecorder;
+                                    if (activeRecorder) {
+                                        void activeRecorder
+                                            .finalize()
+                                            .catch(reportSessionPersistenceError);
+                                    }
+                                },
                             },
                             token.name,
                         );
                         set({ liveManagerInstance: manager });
                     }
 
-                    const language =
-                        AVAILABLE_LANGUAGES.find(
-                            ({ code }) => code === state.selectedLanguage,
-                        ) ?? AVAILABLE_LANGUAGES[0];
-                    const proficiency =
-                        AVAILABLE_PROFICIENCY_LEVELS.find(
-                            ({ id, label }) =>
-                                id === state.selectedProficiencyLevel ||
-                                label === state.selectedProficiencyLevel,
-                        ) ?? AVAILABLE_PROFICIENCY_LEVELS[0];
-                    const voice =
-                        AVAILABLE_VOICES.find(
-                            ({ id, name }) =>
-                                id === state.selectedAssistantVoice ||
-                                name === state.selectedAssistantVoice,
-                        )?.name ?? state.selectedAssistantVoice;
-
-                    manager.startSession({
+                    await manager.startSession({
                         selected_topic: state.selectedTopic,
                         description: proficiency.description,
                         selected_launguage_name: language.name || "English",
@@ -220,15 +260,22 @@ export const useAudioStore = create<AudioStore>()(
                     });
                 },
                 disconnect: async () => {
-                    const manager = get().liveManagerInstance;
-                    if (!manager) return;
+                    const { liveManagerInstance: manager, sessionRecorder: recorder } = get();
+                    const results = await Promise.allSettled([
+                        manager?.disconnect(),
+                        recorder?.finalize(),
+                    ]);
+                    const persistenceResult = results[1];
+                    if (persistenceResult?.status === "rejected") {
+                        reportSessionPersistenceError(persistenceResult.reason);
+                    }
 
-                    await manager.disconnect();
                     set({
                         connectionState: ConnectionState.DISCONNECTED,
                         isMuted: false,
                         audioLevel: { input: 0, output: 0 },
                         agentState: null,
+                        sessionRecorder: null,
                     });
                 },
                 toggleMute: () => {
