@@ -30,6 +30,7 @@ import {
   AVAILABLE_TOPICS,
 } from "@/lib/constants";
 import SidebarHeader from "./sidebar-header";
+import { useAudioStore } from "@/store/useAudioStore";
 
 function SectionLabel({
   icon: Icon,
@@ -47,6 +48,7 @@ function SectionLabel({
 }
 
 function LeftSidebar() {
+  const { selectedLanguage, selectedProficiencyLevel, selectedAssistantVoice, selectedTopic, setSelectedLanguage, setSelectedProficiencyLevel, setselectedAssistantVoice, setSelectedTopic } = useAudioStore();
   const disabled = false;
 
   // Modern input style matching the clean aesthetic
@@ -65,7 +67,7 @@ function LeftSidebar() {
         {/* Language */}
         <div>
           <SectionLabel icon={Globe}>Launguage</SectionLabel>
-          <Select value={""} onValueChange={() => {}} disabled={disabled}>
+          <Select value={selectedLanguage} onValueChange={setSelectedLanguage} disabled={disabled}>
             <SelectTrigger className={triggerClass}>
               <SelectValue placeholder="Select language" />
             </SelectTrigger>
@@ -91,7 +93,7 @@ function LeftSidebar() {
         {/* Proficiency */}
         <div>
           <SectionLabel icon={GraduationCap}>Skill Level</SectionLabel>
-          <Select value={""} onValueChange={() => {}} disabled={disabled}>
+          <Select value={selectedProficiencyLevel} onValueChange={setSelectedProficiencyLevel} disabled={disabled}>
             <SelectTrigger className={triggerClass}>
               <SelectValue placeholder="Select level" />
             </SelectTrigger>
@@ -110,7 +112,7 @@ function LeftSidebar() {
         {/* Topic */}
         <div>
           <SectionLabel icon={MessageSquare}>Conversation Topic</SectionLabel>
-          <Select value={""} onValueChange={() => {}} disabled={disabled}>
+          <Select value={selectedTopic} onValueChange={setSelectedTopic} disabled={disabled}>
             <SelectTrigger className={triggerClass}>
               <SelectValue placeholder="Select topic" />
             </SelectTrigger>
@@ -127,7 +129,7 @@ function LeftSidebar() {
         {/* Voice */}
         <div>
           <SectionLabel icon={Mic}>AI Voice Persona</SectionLabel>
-          <Select value={""} onValueChange={() => {}} disabled={disabled}>
+          <Select value={selectedAssistantVoice} onValueChange={setselectedAssistantVoice} disabled={disabled}>
             <SelectTrigger className={triggerClass}>
               <SelectValue placeholder="Select voice" />
             </SelectTrigger>

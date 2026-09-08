@@ -1,3 +1,4 @@
+import { AVAILABLE_LANGUAGES, AVAILABLE_PROFICIENCY_LEVELS, AVAILABLE_VOICES } from "@/lib/constants";
 import { LiveManager } from "@/services/liveManager";
 import { AgentState, AudioVolume, ConnectionState, TranscriptItem } from "@/types";
 import { create } from "zustand";
@@ -11,6 +12,14 @@ export type AudioStore = {
     agentState: AgentState;
     liveManagerInstance: LiveManager | null;
     transcript: TranscriptItem[];
+    selectedLanguage: string;
+    selectedTopic: string;
+    selectedAssistantVoice: string;
+    selectedProficiencyLevel: string;
+    setSelectedLanguage: (language: string) => void;
+    setSelectedTopic: (topic: string) => void;
+    setselectedAssistantVoice: (voice: string) => void;
+    setSelectedProficiencyLevel: (level: string) => void;
     connect: () => void;
     disconnect: () => void;
     toggleMute: () => void;
@@ -28,6 +37,14 @@ export const useAudioStore = create<AudioStore>()(
             agentState: null,
             liveManagerInstance: null,
             transcript: [],
+            selectedLanguage: AVAILABLE_LANGUAGES[0].code,
+            selectedTopic: AVAILABLE_PROFICIENCY_LEVELS[0].label,
+            selectedAssistantVoice: AVAILABLE_VOICES[0].id,
+            selectedProficiencyLevel: AVAILABLE_PROFICIENCY_LEVELS[0].id,
+            setSelectedLanguage: (language) => set({ selectedLanguage: language }),
+            setSelectedTopic: (topic) => set({ selectedTopic: topic }),
+            setselectedAssistantVoice: (voice) => set({ selectedAssistantVoice: voice }),
+            setSelectedProficiencyLevel: (level) => set({ selectedProficiencyLevel: level }),
             connect: async () => {
                 const state = get();
 
@@ -105,7 +122,24 @@ export const useAudioStore = create<AudioStore>()(
 
                 // Create Live manager
 
-                manager.startSession();
+                const language = AVAILABLE_LANGUAGES.find(({ code }) => code === state.selectedLanguage) ?? AVAILABLE_LANGUAGES[0];
+                const proficiency = AVAILABLE_PROFICIENCY_LEVELS.find(({ id, label }) =>
+                    id === state.selectedProficiencyLevel || label === state.selectedProficiencyLevel
+                ) ?? AVAILABLE_PROFICIENCY_LEVELS[0];
+                const voice = AVAILABLE_VOICES.find(({ id, name }) =>
+                    id === state.selectedAssistantVoice || name === state.selectedAssistantVoice
+                )?.name ?? state.selectedAssistantVoice;
+
+                manager.startSession({
+                    selected_topic: state.selectedTopic,
+                    description: proficiency.description,
+                    selected_launguage_name: language.name || 'English',
+                    selected_launguage_code: language.code || 'en-us',
+                    selected_launguage_region: language.region || 'United States',
+                    context: "",
+                    selected_proefficent_level: proficiency.label,
+                    selected_assistant_voice: voice,
+                });
             },
             disconnect: async () => {
                 const manager = get().liveManagerInstance;

@@ -14,7 +14,7 @@ import {
     VoiceActivityType,
 } from "@google/genai";
 import { base64ToUint8Array, createPCMBlob, decodeAudioData, getAudioLevel, } from "../lib/audioUtils";
-import { ConnectionState, LiveManagerCallbacks } from "@/types";
+import { ConnectConfig, ConnectionState, LiveManagerCallbacks } from "@/types";
 export class LiveManager {
     private ai: GoogleGenAI;
     private activeSession: Session | null = null;
@@ -45,15 +45,22 @@ export class LiveManager {
 
     }
 
-    async startSession() {
+    async startSession(connectConfig: ConnectConfig) {
         try {
             console.log("starting the session");
 
             this.callbacks.onStateChange(ConnectionState.CONNECTING);
             const config: LiveConnectConfig = {
                 responseModalities: [Modality.AUDIO],
+                speechConfig: {
+                    voiceConfig: {
+                        prebuiltVoiceConfig: {
+                            voiceName: connectConfig.selected_assistant_voice,
+                        },
+                    },
+                },
                 systemInstruction:
-                    this.generateSystemPrompt(),
+                    this.generateSystemPrompt(connectConfig),
                 inputAudioTranscription: {},
                 outputAudioTranscription: {},
             };
@@ -151,11 +158,26 @@ export class LiveManager {
     }
 
 
-    generateSystemPrompt() {
-        return `
-    ROLE: You are an expert language tutor, Your name is "TalkGyan".
+
+  generateSystemPrompt(config: ConnectConfig) {
+    return `
+    ROLE: You are an expert language tutor, Your name is "TalkWalk".
+
+    GOAL: Help the user improve their proficiency in ${config.selected_launguage_name} (${config.selected_launguage_region}).
+    TOPIC: ${config.selected_topic}.
+    USER LEVEL: ${config.selected_proefficent_level}.
+
+    INSTRUCTIONS:
+    1.  **Strictly** speak in ${config.selected_launguage_name}. Only use English if the user is completely stuck or asks for a translation.
+    2.  **Correction Mode**:
+        - If the user makes a grammar or pronunciation mistake, gently correct it *first*, then continue the conversation.
+        - Format: "Small tip: In ${config.selected_launguage_name} we say [Correction]. Anyway, [Response]?"
+    3.  **Conversation Flow**:
+        - Keep responses concise (1-3 sentences).
+        - Ask open-ended questions to keep the user talking.
     `;
-    }
+  }
+
 
     handleMessage(message: LiveServerMessage) {
         const serverContent = message.serverContent;
@@ -184,7 +206,7 @@ export class LiveManager {
             this.outputTranscription += serverContent.outputTranscription.text;
             this.callbacks.onTranscript("model", serverContent.outputTranscription.text, true);
         }
-        
+
         if(serverContent?.turnComplete) {
             if(this.inputTranscription) {
                 this.callbacks.onTranscript("user", this.inputTranscription, false);
