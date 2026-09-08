@@ -6,16 +6,20 @@ import { getCurrentUser, isSafeNextPath } from "@/lib/auth";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ next?: string; reset?: string }>;
 }) {
   const [user, params] = await Promise.all([getCurrentUser(), searchParams]);
   const nextPath = isSafeNextPath(params.next) ? params.next : "/tutor";
+  const notice =
+    params.reset === "success"
+      ? "Password updated. Sign in with your new password."
+      : undefined;
 
   if (user) redirect(nextPath);
 
   return (
     <AuthShell>
-      <AuthForm mode="signin" nextPath={nextPath} />
+      <AuthForm mode="signin" nextPath={nextPath} notice={notice} />
     </AuthShell>
   );
 }
