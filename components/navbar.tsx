@@ -51,7 +51,7 @@ export function Navbar() {
           <div className="relative h-11 w-11 overflow-hidden rounded-md">
             <Image
               src="/logo.png"
-              alt="TalkGyan AI"
+              alt="Talk Tutor"
               fill
               sizes="44px"
               className="object-contain"
@@ -60,8 +60,7 @@ export function Navbar() {
           </div>
 
           <span className="text-lg md:text-xl font-semibold tracking-tight">
-            Talk
-            <span className="text-primary">Gyan</span> AI
+            Talk <span className="text-primary">Tutor</span>
           </span>
         </Link>
 

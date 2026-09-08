@@ -31,7 +31,7 @@ function RightSidebar() {
   //     sender: "user",
   //   },
   //   {
-  //     text: "I'm TalkGyan AI Assistant",
+  //     text: "I'm Talk Tutor Assistant",
   //     isPartial: false,
   //     sender: "assistant",
   //   },
@@ -80,7 +80,7 @@ function RightSidebar() {
                     </MessageContent>
 
                     {!isUser && (
-                      <MessageAvatar src="/logo.png" name="TalkGyan" />
+                      <MessageAvatar src="/logo.png" name="Talk Tutor" />
                     )}
                   </Message>
                 );

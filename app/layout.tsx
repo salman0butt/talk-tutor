@@ -12,15 +12,15 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
-const TITLE = "TalkGyan AI";
+const TITLE = "Talk Tutor";
 const DESCRIPTION = "Learn languages by speaking";
-const BASE_URL = "https://talkgyanai.vercel.app";
+const BASE_URL = "https://talk-tutor.vercel.app";
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
   title: TITLE,
   description: DESCRIPTION,
-  keywords: "talkgyan,codersgyan,talkgyanai",
+  keywords: "talk tutor,language learning,ai tutor",
   authors: [
     {
       name: "codersgyan",

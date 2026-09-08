@@ -167,6 +167,6 @@ export const useAudioStore = create<AudioStore>()(
             }
 
         }),
-        { name: "TalkGyan Audio Store" },
+        { name: "Talk Tutor Audio Store" },
     ),
 );
