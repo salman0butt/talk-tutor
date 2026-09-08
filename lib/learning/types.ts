@@ -113,3 +113,11 @@ export interface DashboardSnapshot {
   recentScores: number[];
   practiceDates: string[];
 }
+
+export interface SessionStartInput {
+  language: string;
+  proficiencyLevel: string;
+  topic: string;
+  assistantVoice: string;
+  messages: FinalTranscriptMessage[];
+}
