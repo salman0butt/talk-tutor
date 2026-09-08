@@ -67,5 +67,12 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/tutor/:path*", "/api/token"],
+  matcher: [
+    "/tutor/:path*",
+    "/dashboard/:path*",
+    "/history/:path*",
+    "/profile/:path*",
+    "/api/token",
+    "/api/learning/:path*",
+  ],
 };
