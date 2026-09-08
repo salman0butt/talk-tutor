@@ -82,9 +82,11 @@ function ErrorMessage({ message }: { message: string }) {
 export function AuthForm({
   mode,
   nextPath = "/tutor",
+  notice,
 }: {
   mode: AuthMode;
   nextPath?: string;
+  notice?: string;
 }) {
   const router = useRouter();
   const isSignup = mode === "signup";
@@ -166,6 +168,15 @@ export function AuthForm({
             : "Your AI language tutor is ready when you are."}
         </p>
       </div>
+
+      {notice && (
+        <div
+          role="status"
+          className="mb-5 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200"
+        >
+          {notice}
+        </div>
+      )}
 
       <form onSubmit={submit} className="space-y-5">
         {isSignup && (
