@@ -115,7 +115,7 @@ Child rows include `user_id` and a composite FK back to the owner/session pair, 
 2. Missing profile is inserted using authenticated PostgREST.
 3. Initial preferences hydrate the Zustand store once.
 4. Language/proficiency/voice setters update Zustand immediately.
-5. Setters debounce persistence to `PUT /api/learning/profile`.
+5. Setters persist changed tutor preferences to `PATCH /api/learning/profile`.
 6. Profile/settings UI exposes goal, daily target, timezone, and tutor defaults.
 
 Topic remains session-specific rather than a profile preference.
@@ -203,7 +203,7 @@ Vocabulary normalization lowercases, Unicode-normalizes, trims, and collapses wh
 
 All routes are protected by the existing auth proxy plus handler-level authenticated-user checks.
 
-- `GET/PUT /api/learning/profile`
+- `GET/PATCH /api/learning/profile`
 - `POST /api/learning/sessions`
 - `POST /api/learning/sessions/:id/messages`
 - `PATCH /api/learning/sessions/:id`
