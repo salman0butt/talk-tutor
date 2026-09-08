@@ -52,7 +52,7 @@ export async function proxy(request: NextRequest) {
         | null;
 
       if (refreshResponse.ok && session?.access_token) {
-        const response = NextResponse.redirect(request.nextUrl, { status: 307 });
+        const response = NextResponse.redirect(request.nextUrl);
         setSessionCookies(response, session);
         return response;
       }
