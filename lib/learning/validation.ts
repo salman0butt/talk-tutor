@@ -142,3 +142,31 @@ export function parseSessionFeedback(input: unknown): SessionFeedback {
     nextSteps: ensureArray(data.nextSteps, "nextSteps", 12).map((item) => requiredString(item, "Next step", 500)),
   };
 }
+
+const TOPICS = new Set([
+  "Free Chat",
+  "Business Meeting",
+  "Travel & Directions",
+  "Job Interview",
+  "Ordering Food",
+  "Daily Routine",
+  "Movies & Hobbies",
+]);
+
+export function parseStartSessionInput(input: unknown) {
+  const data = asRecord(input, "Session start");
+  const language = requiredString(data.language, "Language", 16);
+  if (!LANGUAGES.has(language)) throw new Error("Unsupported session language.");
+  const proficiencyLevel = requiredString(data.proficiencyLevel, "Proficiency level", 32);
+  if (!LEVELS.has(proficiencyLevel)) throw new Error("Unsupported proficiency level.");
+  const topic = requiredString(data.topic, "Topic", 120);
+  if (!TOPICS.has(topic)) throw new Error("Unsupported conversation topic.");
+  const assistantVoice = requiredString(data.assistantVoice, "Assistant voice", 32);
+  if (!VOICES.has(assistantVoice)) throw new Error("Unsupported assistant voice.");
+  const rawMessages = ensureArray(data.messages, "messages", 20);
+  const messages = rawMessages.map(parseFinalTranscriptMessage);
+  if (!messages.some((message) => message.role === "user")) {
+    throw new Error("A finalized user message is required to start a session.");
+  }
+  return { language, proficiencyLevel, topic, assistantVoice, messages };
+}
