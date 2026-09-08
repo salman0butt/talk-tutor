@@ -5,6 +5,7 @@ import {
   isUuid,
   parseFinalTranscriptMessage,
   parseSessionFeedback,
+  parseStartSessionInput,
 } from '../../lib/learning/validation.ts';
 
 test('profile patch accepts supported learner preferences', () => {
@@ -90,4 +91,26 @@ test('text-only feedback strips pronunciation claims', () => {
     pronunciationNotes: [{ term: 'departure', note: 'You pronounced this incorrectly.' }],
   });
   assert.deepEqual(parsed.pronunciationNotes, []);
+});
+
+test('session start validation requires supported config and a finalized user turn', () => {
+  const parsed = parseStartSessionInput({
+    language: 'fr-FR',
+    proficiencyLevel: 'Intermediate',
+    topic: 'Travel & Directions',
+    assistantVoice: 'Aoede',
+    messages: [
+      { role: 'assistant', text: 'Bonjour', sequence: 0, occurredAt: '2026-09-09T10:00:00Z' },
+      { role: 'user', text: 'Salut', sequence: 1, occurredAt: '2026-09-09T10:00:02Z' },
+    ],
+  });
+  assert.equal(parsed.messages.length, 2);
+  assert.throws(() => parseStartSessionInput({
+    language: 'xx-XX', proficiencyLevel: 'Intermediate', topic: 'Travel & Directions', assistantVoice: 'Aoede',
+    messages: [{ role: 'user', text: 'Hi', sequence: 0 }],
+  }), /language/i);
+  assert.throws(() => parseStartSessionInput({
+    language: 'fr-FR', proficiencyLevel: 'Intermediate', topic: 'Free Chat', assistantVoice: 'Aoede',
+    messages: [{ role: 'assistant', text: 'Hi', sequence: 0 }],
+  }), /user message/i);
 });
