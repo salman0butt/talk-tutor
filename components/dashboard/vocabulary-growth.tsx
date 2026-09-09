@@ -15,11 +15,16 @@ export function VocabularyGrowth({
   newThisWeek: number;
   growth: Array<{ date: string; count: number }>;
 }) {
-  let cumulative = 0;
-  const points = growth.map((entry) => {
-    cumulative += entry.count;
-    return { ...entry, cumulative };
-  });
+  const points = growth.reduce<Array<{ date: string; count: number; cumulative: number }>>(
+    (result, entry) => [
+      ...result,
+      {
+        ...entry,
+        cumulative: (result.at(-1)?.cumulative ?? 0) + entry.count,
+      },
+    ],
+    [],
+  );
   const recent = points.slice(-8);
   const maximum = Math.max(1, ...recent.map((point) => point.cumulative));
 
