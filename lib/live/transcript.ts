@@ -21,6 +21,7 @@ export interface TranscriptState {
   outputText: string;
   inputActivityActive: boolean;
   inputActivityStartedAt: number | null;
+  pendingInputBoundary: boolean;
   releasedMessageIds: string[];
 }
 
@@ -61,6 +62,7 @@ export function createTranscriptState(sessionId: string): TranscriptState {
     outputText: "",
     inputActivityActive: false,
     inputActivityStartedAt: null,
+    pendingInputBoundary: false,
     releasedMessageIds: [],
   };
 }
@@ -234,6 +236,7 @@ function completeSpeaker(
       inputCommittedText: "",
       inputInterimText: "",
       inputActivityStartedAt: null,
+      pendingInputBoundary: false,
     };
   }
 
@@ -297,13 +300,32 @@ export function applyTranscriptEvent(
   let nextState = state;
 
   switch (event.type) {
-    case "input-activity-start":
+    case "input-activity-start": {
+      let activityState = state;
+
+      if (state.pendingInputBoundary) {
+        if (hasMeaningfulText(state.inputCommittedText)) {
+          activityState = completeSpeaker(state, "user", event.at);
+        } else {
+          activityState = removeStreamingMessage(state, "user");
+          activityState = {
+            ...activityState,
+            inputCommittedText: "",
+            inputInterimText: "",
+            inputActivityStartedAt: null,
+            pendingInputBoundary: false,
+          };
+        }
+      }
+
       nextState = {
-        ...state,
+        ...activityState,
         inputActivityActive: true,
-        inputActivityStartedAt: state.inputActivityStartedAt ?? event.at,
+        inputActivityStartedAt: event.at,
+        pendingInputBoundary: false,
       };
       break;
+    }
 
     case "input-activity-end":
       nextState = {
@@ -392,9 +414,16 @@ export function applyTranscriptEvent(
     }
 
     case "turn-complete":
-      nextState = state.inputActivityActive
-        ? state
-        : completeSpeaker(state, "user", event.at);
+      if (state.inputActivityActive) {
+        nextState = state;
+      } else if (state.inputMessageId) {
+        nextState = completeSpeaker(state, "user", event.at);
+      } else {
+        nextState = {
+          ...state,
+          pendingInputBoundary: state.inputActivityStartedAt !== null,
+        };
+      }
       nextState = completeSpeaker(nextState, "assistant", event.at);
       break;
 
@@ -419,6 +448,7 @@ export function applyTranscriptEvent(
         ...nextState,
         inputActivityActive: false,
         inputActivityStartedAt: null,
+        pendingInputBoundary: false,
       };
       break;
   }
