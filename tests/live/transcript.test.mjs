@@ -91,14 +91,17 @@ test('assistant transcription deltas stream in one row and finished commits once
 
   assert.equal(transition.completed.length, 1);
   assert.equal(transition.completed[0].text, 'Hello there');
-  assert.equal(transition.state.messages[0].status, 'complete');
+  const assistant = transition.state.messages.find(
+    (message) => message.speaker === 'assistant',
+  );
+  assert.equal(assistant.status, 'complete');
 
   const repeatedBoundary = applyTranscriptEvent(
     transition.state,
     { type: 'turn-complete', at: 1020 },
   );
   assert.equal(repeatedBoundary.completed.length, 0);
-  assert.equal(repeatedBoundary.state.messages.length, 1);
+  assert.equal(repeatedBoundary.state.messages.length, 2);
 });
 
 test('assistant output does not prematurely finalize a user turn whose final transcription is pending', () => {
