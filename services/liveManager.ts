@@ -19,7 +19,6 @@ import {
   type ConnectConfig,
   ConnectionState,
   type LiveConversationError,
-  type LiveConversationErrorCode,
   type LiveManagerCallbacks,
 } from "@/types";
 
