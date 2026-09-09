@@ -46,8 +46,6 @@ export type AudioStore = {
   isMuted: boolean;
   audioLevel: AudioVolume;
   agentState: AgentState;
-  liveManagerInstance: LiveManager | null;
-  sessionRecorder: LearningSessionRecorder | null;
   transcriptState: TranscriptState;
   selectedInputDeviceId: string;
   selectedLanguage: string;
@@ -95,6 +93,8 @@ export const useAudioStore = create<AudioStore>()(
     (set, get) => {
       let connectAttempt = 0;
       let transcriptSessionSequence = 0;
+      let activeManager: LiveManager | null = null;
+      let activeRecorder: LearningSessionRecorder | null = null;
 
       const persistPreference = async (patch: TutorPreferencePatch) => {
         set({ preferencesSaving: true, preferenceError: null });
@@ -144,8 +144,6 @@ export const useAudioStore = create<AudioStore>()(
         isMuted: false,
         audioLevel: { input: 0, output: 0 },
         agentState: null,
-        liveManagerInstance: null,
-        sessionRecorder: null,
         transcriptState: createTranscriptState("idle"),
         selectedInputDeviceId: "",
         ...DEFAULT_CONFIGURATION,
@@ -368,7 +366,7 @@ export const useAudioStore = create<AudioStore>()(
           const manager = new LiveManager(
             {
               onStateChange: (newState) => {
-                if (get().liveManagerInstance !== manager) return;
+                if (activeManager !== manager) return;
                 set({
                   connectionState: newState,
                   agentState:
@@ -382,7 +380,7 @@ export const useAudioStore = create<AudioStore>()(
               },
 
               onTranscriptEvent: (event) => {
-                if (get().liveManagerInstance !== manager) return;
+                if (activeManager !== manager) return;
 
                 const transition = applyTranscriptEvent(
                   get().transcriptState,
@@ -406,7 +404,7 @@ export const useAudioStore = create<AudioStore>()(
               },
 
               onAudioLevel: (level, type) => {
-                if (get().liveManagerInstance !== manager) return;
+                if (activeManager !== manager) return;
                 set((current) => ({
                   audioLevel: {
                     ...current.audioLevel,
@@ -416,22 +414,22 @@ export const useAudioStore = create<AudioStore>()(
               },
 
               onAgentState: (agentState) => {
-                if (get().liveManagerInstance !== manager) return;
+                if (activeManager !== manager) return;
                 set({ agentState });
               },
 
               onError: (liveError) => {
-                if (get().liveManagerInstance !== manager) return;
+                if (activeManager !== manager) return;
                 reportLiveError(liveError);
               },
 
               onSessionClosed: () => {
                 void recorder.finalize().catch(reportSessionPersistenceError);
-                if (get().liveManagerInstance !== manager) return;
+                if (activeManager !== manager) return;
 
+                activeManager = null;
+                activeRecorder = null;
                 set({
-                  liveManagerInstance: null,
-                  sessionRecorder: null,
                   isMuted: false,
                   audioLevel: { input: 0, output: 0 },
                   agentState: null,
@@ -441,10 +439,8 @@ export const useAudioStore = create<AudioStore>()(
             token.name,
           );
 
-          set({
-            liveManagerInstance: manager,
-            sessionRecorder: recorder,
-          });
+          activeManager = manager;
+          activeRecorder = recorder;
 
           await manager.startSession({
             selected_topic: practiceConfig.topic,
@@ -462,13 +458,13 @@ export const useAudioStore = create<AudioStore>()(
 
           if (
             attempt === connectAttempt &&
-            get().liveManagerInstance === manager &&
+            activeManager === manager &&
             get().connectionState === ConnectionState.ERROR
           ) {
             await recorder.finalize().catch(reportSessionPersistenceError);
+            activeManager = null;
+            activeRecorder = null;
             set({
-              liveManagerInstance: null,
-              sessionRecorder: null,
               isMuted: false,
               audioLevel: { input: 0, output: 0 },
               agentState: null,
@@ -479,10 +475,8 @@ export const useAudioStore = create<AudioStore>()(
         disconnect: async () => {
           ++connectAttempt;
 
-          const {
-            liveManagerInstance: manager,
-            sessionRecorder: recorder,
-          } = get();
+          const manager = activeManager;
+          const recorder = activeRecorder;
 
           set({
             connectionState: ConnectionState.DISCONNECTING,
@@ -499,17 +493,17 @@ export const useAudioStore = create<AudioStore>()(
             reportSessionPersistenceError(persistenceResult.reason);
           }
 
-          if (get().liveManagerInstance && get().liveManagerInstance !== manager) {
+          if (activeManager && activeManager !== manager) {
             return;
           }
 
+          activeManager = null;
+          activeRecorder = null;
           set({
             connectionState: ConnectionState.DISCONNECTED,
             isMuted: false,
             audioLevel: { input: 0, output: 0 },
             agentState: null,
-            liveManagerInstance: null,
-            sessionRecorder: null,
           });
         },
 
@@ -519,7 +513,7 @@ export const useAudioStore = create<AudioStore>()(
 
           const newMuteState = !state.isMuted;
           set({ isMuted: newMuteState });
-          state.liveManagerInstance?.setMute(newMuteState);
+          activeManager?.setMute(newMuteState);
         },
       };
     },
