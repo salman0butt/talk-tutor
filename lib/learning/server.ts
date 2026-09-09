@@ -2,6 +2,7 @@ import "server-only";
 
 import { getCurrentAccessToken, getCurrentUser } from "@/lib/auth";
 import {
+  buildWeeklyPracticeSeries,
   calculateDateKeyStreak,
   localDateKey,
   summarizeFluencyTrend,
@@ -61,6 +62,7 @@ export async function getDashboardViewModel() {
     snapshot,
     streak: calculateDateKeyStreak(snapshot.practiceDates, today),
     fluencyTrend: summarizeFluencyTrend([...snapshot.recentScores].reverse()),
+    weeklyPractice: buildWeeklyPracticeSeries(snapshot.weeklyPractice, today, 7),
     recentSessions,
   };
 }
