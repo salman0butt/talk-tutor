@@ -4,11 +4,11 @@ import {
   type PendingTranscriptTurn,
 } from "./session-lifecycle.ts";
 import type { FinalTranscriptMessage, TranscriptRole } from "./types.ts";
+import type { PracticeConfiguration } from "./practice.ts";
 
-export interface SessionRecorderConfig {
+export interface SessionRecorderConfig extends PracticeConfiguration {
   language: string;
   proficiencyLevel: string;
-  topic: string;
   assistantVoice: string;
 }
 
