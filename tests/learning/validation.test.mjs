@@ -114,3 +114,52 @@ test('session start validation requires supported config and a finalized user tu
     messages: [{ role: 'assistant', text: 'Hi', sequence: 0 }],
   }), /user message/i);
 });
+
+
+test('profile patch accepts personalized practice defaults', () => {
+  assert.deepEqual(
+    parseProfilePatch({
+      correctionFrequency: 'minimal',
+      conversationDifficulty: 'challenging',
+    }),
+    {
+      correctionFrequency: 'minimal',
+      conversationDifficulty: 'challenging',
+    },
+  );
+  assert.throws(
+    () => parseProfilePatch({ correctionFrequency: 'constant' }),
+    /correction/i,
+  );
+  assert.throws(
+    () => parseProfilePatch({ conversationDifficulty: 'impossible' }),
+    /difficulty/i,
+  );
+});
+
+test('session start accepts a safe free-form topic and full personalized practice configuration', () => {
+  const parsed = parseStartSessionInput({
+    language: 'en-US',
+    proficiencyLevel: 'Intermediate',
+    topic: '  Software   engineering interview preparation ',
+    assistantVoice: 'Aoede',
+    practiceMode: 'roleplay',
+    scenarioId: 'job-interview',
+    customScenario: 'The interviewer asks about a delayed project.',
+    learnerRole: 'Candidate',
+    tutorRole: 'Hiring manager',
+    correctionFrequency: 'frequent',
+    difficulty: 'challenging',
+    targetMistakeCategories: ['articles', 'verb_tense'],
+    messages: [
+      { role: 'user', text: 'Tell me about the role.', sequence: 0, occurredAt: '2026-09-09T12:00:00Z' },
+    ],
+  });
+
+  assert.equal(parsed.topic, 'Software engineering interview preparation');
+  assert.equal(parsed.practiceMode, 'roleplay');
+  assert.equal(parsed.scenarioId, 'job-interview');
+  assert.equal(parsed.correctionFrequency, 'frequent');
+  assert.equal(parsed.difficulty, 'challenging');
+  assert.deepEqual(parsed.targetMistakeCategories, ['articles', 'verb_tense']);
+});
