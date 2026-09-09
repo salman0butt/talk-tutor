@@ -3,7 +3,7 @@ name: Learning Platform CI
 on:
   push:
     branches:
-      - feat/saas-learning-platform
+      - feat/personalized-learning-vocabulary
   pull_request:
     branches:
       - main
