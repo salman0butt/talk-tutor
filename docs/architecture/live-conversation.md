@@ -152,7 +152,7 @@ When `inputTranscription.finished === true`, the user row can be finalized immed
 
 `outputTranscription.text` chunks append in provider order. `outputTranscription.finished === true` finalizes the assistant row when that optional signal is available; `turnComplete` remains the normal fallback.
 
-Assistant output does **not** finalize a pending user row, because Gemini input and output transcription delivery can be independent.
+Assistant output does **not** finalize a pending user row, because Gemini input and output transcription delivery can be independent. If assistant transcription arrives before any user transcript/activity evidence, the reducer creates an implicit ordering reservation: the assistant row may render and play normally, but it is not released to persistence until a late user transcript, a later input boundary, or session end resolves whether earlier user text exists.
 
 `turnComplete` remains a fallback boundary for provider cases where `finished` is absent or has not finalized streaming text. It will not finalize user input while user voice activity is currently active. If a delayed input transcription arrives after `turnComplete`, the reducer keeps that prior-turn reservation open and seals it at the next deterministic input/session boundary so it cannot leak into the next utterance.
 
