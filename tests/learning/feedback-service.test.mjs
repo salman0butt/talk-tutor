@@ -232,9 +232,7 @@ test('feedback provider JSON parser accepts raw JSON and fenced JSON', () => {
     { ok: true },
   );
   assert.deepEqual(
-    parseFeedbackProviderJson(````json
-{"ok":true}
-````),
+    parseFeedbackProviderJson('```json\n{"ok":true}\n```'),
     { ok: true },
   );
 });
