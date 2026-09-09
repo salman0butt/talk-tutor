@@ -8,6 +8,7 @@ import {
   summarizeFluencyTrend,
 } from "@/lib/learning/analytics";
 import { requireAuthenticatedUserId } from "@/lib/learning/ownership";
+import { selectTargetMistakes } from "@/lib/learning/practice";
 import { LearningRepository } from "@/lib/learning/repository";
 import type { LearningProfilePatch } from "@/lib/learning/types";
 import { isUuid, parseProfilePatch } from "@/lib/learning/validation";
@@ -68,6 +69,18 @@ export async function getDashboardViewModel() {
 }
 
 
+
+export async function getTutorPracticeContext() {
+  const repository = await requireLearningRepository();
+  const [profile, snapshot] = await Promise.all([
+    repository.ensureProfile(),
+    repository.getDashboardSnapshot(),
+  ]);
+  return {
+    profile,
+    targetMistakeCategories: selectTargetMistakes(snapshot.commonMistakes),
+  };
+}
 
 export async function getVocabularyViewModel() {
   const repository = await requireLearningRepository();
