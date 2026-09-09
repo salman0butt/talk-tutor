@@ -6,17 +6,37 @@ import StatusPanel from "@/components/status-panel";
 import ControlsPanel from "@/components/controls-panel";
 import VisualizationPanel from "@/components/visualization-panel";
 import { getCurrentUser } from "@/lib/auth";
-import { getOrCreateLearningProfile } from "@/lib/learning/server";
+import { getTutorPracticeContext } from "@/lib/learning/server";
 import { ProfileHydrator } from "@/components/learning/profile-hydrator";
+import { GRAMMAR_CATEGORIES, type GrammarCategory } from "@/lib/learning/types";
+import type { PracticeMode } from "@/lib/learning/practice";
 
-export default async function TutorPage() {
+const PRACTICE_MODES = new Set(["conversation", "roleplay", "mistakes", "custom"]);
+const CATEGORY_SET = new Set<string>(GRAMMAR_CATEGORIES);
+
+export default async function TutorPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mode?: string; scenario?: string; target?: string }>;
+}) {
   const user = await getCurrentUser();
 
   if (!user) {
     redirect("/login?next=/tutor");
   }
 
-  const profile = await getOrCreateLearningProfile();
+  const [{ profile, targetMistakeCategories }, query] = await Promise.all([
+    getTutorPracticeContext(),
+    searchParams,
+  ]);
+
+  const practiceMode = PRACTICE_MODES.has(query.mode ?? "")
+    ? (query.mode as PracticeMode)
+    : undefined;
+  const queryTarget =
+    query.target && CATEGORY_SET.has(query.target)
+      ? [query.target as GrammarCategory]
+      : undefined;
 
   return (
     <div className="flex h-dvh w-full flex-col overflow-hidden">
@@ -24,6 +44,11 @@ export default async function TutorPage() {
         preferredLanguage={profile.preferredLanguage}
         proficiencyLevel={profile.proficiencyLevel}
         preferredVoice={profile.preferredVoice}
+        correctionFrequency={profile.correctionFrequency}
+        conversationDifficulty={profile.conversationDifficulty}
+        practiceMode={practiceMode}
+        scenarioId={query.scenario}
+        targetMistakeCategories={queryTarget ?? targetMistakeCategories}
       />
       <Navbar userEmail={user.email} />
 
