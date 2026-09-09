@@ -1,7 +1,11 @@
 import "server-only";
 
 import { getCurrentAccessToken, getCurrentUser } from "@/lib/auth";
-import { calculatePracticeStreak, summarizeFluencyTrend } from "@/lib/learning/analytics";
+import {
+  calculateDateKeyStreak,
+  localDateKey,
+  summarizeFluencyTrend,
+} from "@/lib/learning/analytics";
 import { requireAuthenticatedUserId } from "@/lib/learning/ownership";
 import { LearningRepository } from "@/lib/learning/repository";
 import type { LearningProfilePatch } from "@/lib/learning/types";
@@ -50,17 +54,12 @@ export async function getDashboardViewModel() {
     repository.listSessions(5),
   ]);
 
-  const practiceSessions = snapshot.practiceDates.map((date) => ({
-    endedAt: `${date}T12:00:00.000Z`,
-    durationSeconds: 60,
-    userMessageCount: 1,
-    status: "completed",
-  }));
+  const today = localDateKey(new Date(), profile.timezone);
 
   return {
     profile,
     snapshot,
-    streak: calculatePracticeStreak(practiceSessions, "UTC", new Date()),
+    streak: calculateDateKeyStreak(snapshot.practiceDates, today),
     fluencyTrend: summarizeFluencyTrend([...snapshot.recentScores].reverse()),
     recentSessions,
   };
