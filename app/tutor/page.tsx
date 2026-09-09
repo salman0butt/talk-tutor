@@ -8,6 +8,7 @@ import VisualizationPanel from "@/components/visualization-panel";
 import { getCurrentUser } from "@/lib/auth";
 import { getTutorPracticeContext } from "@/lib/learning/server";
 import { ProfileHydrator } from "@/components/learning/profile-hydrator";
+import { TutorSessionLifecycle } from "@/components/tutor-session-lifecycle";
 import {
   GRAMMAR_CATEGORIES,
   type GrammarCategory,
@@ -50,6 +51,7 @@ export default async function TutorPage({
 
   return (
     <div className="flex h-dvh w-full flex-col overflow-hidden">
+      <TutorSessionLifecycle />
       <ProfileHydrator
         preferredLanguage={profile.preferredLanguage}
         proficiencyLevel={profile.proficiencyLevel}
@@ -83,9 +85,6 @@ export default async function TutorPage({
             <StatusPanel />
           </div>
 
-          <div className="absolute inset-x-3 top-24 z-10 h-[32vh] min-h-44 max-h-72 overflow-hidden rounded-xl border bg-sidebar/90 shadow-lg backdrop-blur lg:hidden">
-            <RightSidebar />
-          </div>
 
           <div className="flex h-full w-full flex-1 items-center justify-center">
             <VisualizationPanel />
