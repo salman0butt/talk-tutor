@@ -207,7 +207,7 @@ That CI database check proves migration parsing and expected security objects. I
 
 The Tutor uses Gemini Live model `gemini-2.5-flash-native-audio-preview-12-2025` for bidirectional native audio. Microphone PCM is sent with the browser audio context's actual sample rate, and Gemini output is decoded as 24 kHz mono PCM.
 
-Realtime transcript state explicitly separates streaming rows from completed history and defensively handles both delta and cumulative provider transcription updates. See `docs/architecture/live-conversation.md` for the complete lifecycle, transcript, playback, interruption, cleanup, and testing model.
+Realtime transcript state explicitly separates streaming rows from completed history, preserves the SDK `Transcription.finished` signal, keeps interim input as a replaceable snapshot, and appends finalized transcription chunks without repeated-word-destroying heuristics. See `docs/architecture/live-conversation.md` for the complete lifecycle, transcript, playback, interruption, cleanup, and testing model.
 
 ## Existing audio components
 
