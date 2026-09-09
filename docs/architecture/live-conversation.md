@@ -112,7 +112,7 @@ It converts `LiveServerMessage` into only the signals the application needs:
 - audio chunks
 - waiting/in-progress flags
 
-The installed `@google/genai@2.19.0` SDK exposes `Transcription.finished?: boolean`. The application preserves that signal instead of inferring finality from assistant output ordering.
+The installed `@google/genai@2.19.0` SDK type exposes an optional `Transcription.finished?: boolean`, and the application honors it when present. The Live API wire contract does not require that field and input/output transcriptions can arrive independently, so correctness does not depend on `finished` being emitted.
 
 All audio parts in a model turn are inspected. The implementation does not assume audio is always `parts[0]`.
 
@@ -146,15 +146,15 @@ The state keeps explicit input/output streaming buffers and immutable completed 
 
 `inputTranscription.text` is treated as transcription chunks and appended in provider order. Legitimate repeated speech such as `"very "` + `"very "` remains `"very very "`; arbitrary overlap heuristics are deliberately avoided.
 
-When `inputTranscription.finished === true`, the user row is finalized immediately. If final input transcription arrives after assistant output has begun and no user row existed yet, the reducer inserts that user row before the still-streaming assistant row to preserve conversational order.
+When `inputTranscription.finished === true`, the user row can be finalized immediately. When that signal is absent, `turnComplete`, user voice activity, the next input boundary, and session end provide deterministic fallback boundaries. If input transcription arrives after assistant output has begun, the reducer preserves the earlier user activity position and withholds persistence until chronological predecessors are resolved.
 
 ### Output semantics
 
-`outputTranscription.text` chunks append in provider order. `outputTranscription.finished === true` finalizes the assistant row immediately.
+`outputTranscription.text` chunks append in provider order. `outputTranscription.finished === true` finalizes the assistant row when that optional signal is available; `turnComplete` remains the normal fallback.
 
 Assistant output does **not** finalize a pending user row, because Gemini input and output transcription delivery can be independent.
 
-`turnComplete` remains a fallback boundary for provider cases where `finished` has not finalized the streaming text. It will not finalize user input while user voice activity is currently active, which prevents the previous model turn's completion from closing a new barge-in utterance.
+`turnComplete` remains a fallback boundary for provider cases where `finished` is absent or has not finalized streaming text. It will not finalize user input while user voice activity is currently active. If a delayed input transcription arrives after `turnComplete`, the reducer keeps that prior-turn reservation open and seals it at the next deterministic input/session boundary so it cannot leak into the next utterance.
 
 ### Interruption
 
@@ -229,6 +229,10 @@ Ephemeral tokens, API keys, raw audio, and full transcripts are not logged.
 
 The existing authenticated `/api/token` endpoint remains the credential boundary; the Gemini API key stays server-side.
 
+## Provider session limits
+
+This branch intentionally does not add automatic Live-session resumption or context-window compression. If Gemini closes a long-running session or sends a provider shutdown/go-away signal, the current behavior is to clean up safely, surface the ended session, finalize observed transcript data, and let the learner reconnect. Session resumption/context compression can be added separately if uninterrupted very-long sessions become a product requirement.
+
 ## Rendering and scrolling
 
 The transcript UI subscribes only to transcript messages. Controls, status, practice setup, and visualization use focused Zustand selectors, so high-frequency audio-level updates do not force unrelated Tutor components to rerender.
@@ -243,8 +247,8 @@ Deterministic tests cover:
 
 - interim input snapshot replacement
 - input/output transcription delta accumulation
-- SDK `finished` finalization
-- late final input arriving after assistant output
+- optional SDK `finished` finalization plus no-`finished` fallbacks
+- late input arriving after assistant output or after `turnComplete`
 - repeated-word preservation
 - speaker ordering
 - barge-in and interruption boundaries
