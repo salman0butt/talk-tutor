@@ -141,3 +141,32 @@ test('a new transcript session does not inherit streaming buffers from the previ
   assert.equal(newState.inputInterimText, '');
   assert.equal(newState.outputText, '');
 });
+
+test('cumulative final input snapshots do not duplicate prior text', () => {
+  let state = createTranscriptState('session-cumulative-input');
+  state = applyTranscriptEvent(state, event('input-final', 'I', 1000)).state;
+  state = applyTranscriptEvent(state, event('input-final', 'I want', 1010)).state;
+  state = applyTranscriptEvent(state, event('input-final', 'I want coffee', 1020)).state;
+
+  const transition = applyTranscriptEvent(
+    state,
+    event('output-fragment', 'Okay.', 1030),
+  );
+
+  assert.equal(transition.completed[0].text, 'I want coffee');
+});
+
+test('cumulative and duplicate assistant transcript events merge without repetition', () => {
+  let state = createTranscriptState('session-cumulative-output');
+  state = applyTranscriptEvent(state, event('output-fragment', 'Hello', 1000)).state;
+  state = applyTranscriptEvent(state, event('output-fragment', 'Hello there', 1010)).state;
+  state = applyTranscriptEvent(state, event('output-fragment', 'Hello there', 1020)).state;
+
+  const transition = applyTranscriptEvent(
+    state,
+    event('turn-complete', undefined, 1030),
+  );
+
+  assert.equal(transition.completed.length, 1);
+  assert.equal(transition.completed[0].text, 'Hello there');
+});
