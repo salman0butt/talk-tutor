@@ -95,3 +95,34 @@ test('creation failure keeps buffered messages so a later final turn can retry',
   assert.equal(attempts, 2);
   assert.deepEqual(calls[0], ['First', 'Second']);
 });
+
+
+test('finalize retries a failed initial session creation before giving up buffered user turns', async () => {
+  let createAttempts = 0;
+  const calls = { finalize: 0 };
+  const api = {
+    async createSession() {
+      createAttempts += 1;
+      if (createAttempts === 1) throw new Error('temporary database failure');
+      return '550e8400-e29b-41d4-a716-446655440000';
+    },
+    async appendMessage() {},
+    async finalizeSession() {
+      calls.finalize += 1;
+      return { status: 'completed' };
+    },
+  };
+
+  const recorder = new LearningSessionRecorder(api);
+  recorder.begin(config);
+
+  await assert.rejects(
+    recorder.recordFinalTurn('user', 'Please keep this turn', '2026-09-09T10:00:00Z'),
+    /temporary database failure/,
+  );
+
+  await recorder.finalize();
+
+  assert.equal(createAttempts, 2);
+  assert.equal(calls.finalize, 1);
+});
