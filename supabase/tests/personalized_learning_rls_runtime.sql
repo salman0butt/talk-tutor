@@ -82,7 +82,7 @@ select public.start_learning_session(
   'challenging'
 );
 
-do $
+do $$
 begin
   if not exists (
     select 1
@@ -96,7 +96,7 @@ begin
     raise exception 'Personalized practice metadata was not persisted';
   end if;
 end
-$;
+$$;
 
 reset role;
 set role authenticated;
