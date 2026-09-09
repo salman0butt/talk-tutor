@@ -120,11 +120,12 @@ export async function getVocabularyViewModel() {
 
 export async function getVocabularyReviewViewModel() {
   const repository = await requireLearningRepository();
-  const [profile, items] = await Promise.all([
+  const [profile, overview, items] = await Promise.all([
     repository.ensureProfile(),
+    repository.getVocabularyOverview(),
     repository.listDueVocabulary(50),
   ]);
-  return { profile, items };
+  return { profile, overview, items };
 }
 
 export async function getHistoryViewModel() {
