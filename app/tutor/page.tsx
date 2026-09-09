@@ -8,16 +8,28 @@ import VisualizationPanel from "@/components/visualization-panel";
 import { getCurrentUser } from "@/lib/auth";
 import { getTutorPracticeContext } from "@/lib/learning/server";
 import { ProfileHydrator } from "@/components/learning/profile-hydrator";
-import { GRAMMAR_CATEGORIES, type GrammarCategory } from "@/lib/learning/types";
+import {
+  GRAMMAR_CATEGORIES,
+  type GrammarCategory,
+} from "@/lib/learning/types";
 import type { PracticeMode } from "@/lib/learning/practice";
 
-const PRACTICE_MODES = new Set(["conversation", "roleplay", "mistakes", "custom"]);
+const PRACTICE_MODES = new Set([
+  "conversation",
+  "roleplay",
+  "mistakes",
+  "custom",
+]);
 const CATEGORY_SET = new Set<string>(GRAMMAR_CATEGORIES);
 
 export default async function TutorPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mode?: string; scenario?: string; target?: string }>;
+  searchParams: Promise<{
+    mode?: string;
+    scenario?: string;
+    target?: string;
+  }>;
 }) {
   const user = await getCurrentUser();
 
@@ -25,10 +37,8 @@ export default async function TutorPage({
     redirect("/login?next=/tutor");
   }
 
-  const [{ profile, targetMistakeCategories }, query] = await Promise.all([
-    getTutorPracticeContext(),
-    searchParams,
-  ]);
+  const [{ profile, targetMistakeCategories }, query] =
+    await Promise.all([getTutorPracticeContext(), searchParams]);
 
   const practiceMode = PRACTICE_MODES.has(query.mode ?? "")
     ? (query.mode as PracticeMode)
@@ -48,7 +58,9 @@ export default async function TutorPage({
         conversationDifficulty={profile.conversationDifficulty}
         practiceMode={practiceMode}
         scenarioId={query.scenario}
-        targetMistakeCategories={queryTarget ?? targetMistakeCategories}
+        targetMistakeCategories={
+          queryTarget ?? targetMistakeCategories
+        }
       />
       <Navbar userEmail={user.email} />
 
@@ -61,13 +73,18 @@ export default async function TutorPage({
           <div
             className="absolute inset-0 opacity-[0.05]"
             style={{
-              backgroundImage: "radial-gradient(#fff 1px, transparent 1px)",
+              backgroundImage:
+                "radial-gradient(#fff 1px, transparent 1px)",
               backgroundSize: "20px 20px",
             }}
           />
 
-          <div className="pointer-events-none absolute left-0 right-0 top-4 z-10 flex justify-center">
+          <div className="pointer-events-none absolute left-0 right-0 top-4 z-20 flex justify-center">
             <StatusPanel />
+          </div>
+
+          <div className="absolute inset-x-3 top-24 z-10 h-[32vh] min-h-44 max-h-72 overflow-hidden rounded-xl border bg-sidebar/90 shadow-lg backdrop-blur lg:hidden">
+            <RightSidebar />
           </div>
 
           <div className="flex h-full w-full flex-1 items-center justify-center">
