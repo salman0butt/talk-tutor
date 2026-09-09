@@ -30,6 +30,7 @@ import {
 } from "@/lib/learning/types";
 import { useAudioStore } from "@/store/useAudioStore";
 import { ConnectionState } from "@/types";
+import { useShallow } from "zustand/react/shallow";
 import SidebarHeader from "./sidebar-header";
 
 const fieldClass =
@@ -62,7 +63,37 @@ function SectionLabel({
 }
 
 export default function LeftSidebar() {
-  const state = useAudioStore();
+  const state = useAudioStore(
+    useShallow((current) => ({
+      connectionState: current.connectionState,
+      selectedLanguage: current.selectedLanguage,
+      selectedProficiencyLevel: current.selectedProficiencyLevel,
+      selectedAssistantVoice: current.selectedAssistantVoice,
+      selectedTopic: current.selectedTopic,
+      practiceMode: current.practiceMode,
+      correctionFrequency: current.correctionFrequency,
+      difficulty: current.difficulty,
+      scenarioId: current.scenarioId,
+      customScenario: current.customScenario,
+      learnerRole: current.learnerRole,
+      tutorRole: current.tutorRole,
+      targetMistakeCategories: current.targetMistakeCategories,
+      preferencesSaving: current.preferencesSaving,
+      preferenceError: current.preferenceError,
+      setSelectedLanguage: current.setSelectedLanguage,
+      setSelectedProficiencyLevel: current.setSelectedProficiencyLevel,
+      setselectedAssistantVoice: current.setselectedAssistantVoice,
+      setSelectedTopic: current.setSelectedTopic,
+      setPracticeMode: current.setPracticeMode,
+      setCorrectionFrequency: current.setCorrectionFrequency,
+      setDifficulty: current.setDifficulty,
+      applyScenario: current.applyScenario,
+      setCustomScenario: current.setCustomScenario,
+      setLearnerRole: current.setLearnerRole,
+      setTutorRole: current.setTutorRole,
+      setTargetMistakeCategories: current.setTargetMistakeCategories,
+    })),
+  );
   const disabled = state.connectionState !== ConnectionState.DISCONNECTED;
 
   function toggleMistake(category: GrammarCategory) {
