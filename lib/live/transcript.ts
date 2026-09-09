@@ -16,17 +16,31 @@ export interface TranscriptState {
   messages: TranscriptMessage[];
   inputMessageId: string | null;
   outputMessageId: string | null;
-  inputFinalText: string;
+  inputCommittedText: string;
   inputInterimText: string;
   outputText: string;
+  inputActivityActive: boolean;
 }
 
 export type TranscriptEvent =
+  | { type: "input-activity-start"; at: number }
+  | { type: "input-activity-end"; at: number }
   | { type: "input-interim"; text: string; at: number }
-  | { type: "input-final"; text: string; at: number }
-  | { type: "output-fragment"; text: string; at: number }
+  | {
+      type: "input-transcription";
+      text: string;
+      finished: boolean;
+      at: number;
+    }
+  | {
+      type: "output-transcription";
+      text: string;
+      finished: boolean;
+      at: number;
+    }
   | { type: "turn-complete"; at: number }
-  | { type: "interrupted"; at: number };
+  | { type: "interrupted"; at: number }
+  | { type: "session-end"; at: number };
 
 export interface TranscriptTransition {
   state: TranscriptState;
@@ -40,9 +54,10 @@ export function createTranscriptState(sessionId: string): TranscriptState {
     messages: [],
     inputMessageId: null,
     outputMessageId: null,
-    inputFinalText: "",
+    inputCommittedText: "",
     inputInterimText: "",
     outputText: "",
+    inputActivityActive: false,
   };
 }
 
@@ -50,30 +65,45 @@ function hasMeaningfulText(text: string) {
   return text.trim().length > 0;
 }
 
-function mergeTranscriptText(existing: string, incoming: string) {
-  if (!incoming) return existing;
-  if (!existing) return incoming;
-
-  if (incoming.startsWith(existing)) {
-    return incoming;
-  }
-
-  if (existing.endsWith(incoming)) {
-    return existing;
-  }
-
-  const maxOverlap = Math.min(existing.length, incoming.length);
-  for (let overlap = maxOverlap - 1; overlap > 0; overlap--) {
-    if (existing.endsWith(incoming.slice(0, overlap))) {
-      return existing + incoming.slice(overlap);
-    }
-  }
-
-  return existing + incoming;
-}
-
 function messageIdField(speaker: TranscriptSpeaker) {
   return speaker === "user" ? "inputMessageId" : "outputMessageId";
+}
+
+function insertStreamingMessage(
+  state: TranscriptState,
+  speaker: TranscriptSpeaker,
+  text: string,
+  at: number,
+) {
+  const id = `${state.sessionId}-${speaker}-${state.nextMessageNumber}`;
+  const message: TranscriptMessage = {
+    id,
+    speaker,
+    text,
+    status: "streaming",
+    startedAt: at,
+  };
+  const messages = [...state.messages];
+
+  if (speaker === "user" && state.outputMessageId) {
+    const assistantIndex = messages.findIndex(
+      (candidate) => candidate.id === state.outputMessageId,
+    );
+    if (assistantIndex !== -1) {
+      messages.splice(assistantIndex, 0, message);
+    } else {
+      messages.push(message);
+    }
+  } else {
+    messages.push(message);
+  }
+
+  return {
+    ...state,
+    messages,
+    [messageIdField(speaker)]: id,
+    nextMessageNumber: state.nextMessageNumber + 1,
+  };
 }
 
 function upsertStreamingMessage(
@@ -86,32 +116,54 @@ function upsertStreamingMessage(
 
   const idField = messageIdField(speaker);
   const existingId = state[idField];
-  const messages = [...state.messages];
 
-  if (existingId) {
-    const index = messages.findIndex(
-      (message) => message.id === existingId && message.status === "streaming",
-    );
-    if (index !== -1) {
-      messages[index] = { ...messages[index], text };
-      return { ...state, messages };
-    }
+  if (!existingId) {
+    return insertStreamingMessage(state, speaker, text, at);
   }
 
-  const id = `${state.sessionId}-${speaker}-${state.nextMessageNumber}`;
-  messages.push({
-    id,
-    speaker,
-    text,
-    status: "streaming",
-    startedAt: at,
-  });
+  const messages = [...state.messages];
+  const index = messages.findIndex(
+    (message) =>
+      message.id === existingId && message.status === "streaming",
+  );
 
+  if (index === -1) {
+    return insertStreamingMessage(
+      {
+        ...state,
+        [idField]: null,
+      },
+      speaker,
+      text,
+      at,
+    );
+  }
+
+  messages[index] = {
+    ...messages[index],
+    text,
+  };
   return {
     ...state,
     messages,
-    [idField]: id,
-    nextMessageNumber: state.nextMessageNumber + 1,
+  };
+}
+
+function removeStreamingMessage(
+  state: TranscriptState,
+  speaker: TranscriptSpeaker,
+): TranscriptState {
+  const idField = messageIdField(speaker);
+  const messageId = state[idField];
+  if (!messageId) return state;
+
+  return {
+    ...state,
+    messages: state.messages.filter(
+      (message) =>
+        !(message.id === messageId && message.status === "streaming"),
+    ),
+    [idField]: null,
   };
 }
 
@@ -129,7 +181,8 @@ function finalizeSpeaker(
 
   const messages = [...state.messages];
   const index = messages.findIndex(
-    (message) => message.id === messageId && message.status === "streaming",
+    (message) =>
+      message.id === messageId && message.status === "streaming",
   );
 
   if (index === -1) {
@@ -169,7 +222,7 @@ function finalizeSpeaker(
           ...state,
           messages,
           inputMessageId: null,
-          inputFinalText: "",
+          inputCommittedText: "",
           inputInterimText: "",
         }
       : {
@@ -179,7 +232,10 @@ function finalizeSpeaker(
           outputText: "",
         };
 
-  return { state: nextState, completed: [completedMessage] };
+  return {
+    state: nextState,
+    completed: [completedMessage],
+  };
 }
 
 function finalizeInput(state: TranscriptState, at: number) {
@@ -190,86 +246,135 @@ function finalizeOutput(state: TranscriptState, at: number) {
   return finalizeSpeaker(state, "assistant", at);
 }
 
+function visibleInputText(state: TranscriptState, committedText: string) {
+  if (
+    state.inputInterimText &&
+    state.inputInterimText.startsWith(committedText)
+  ) {
+    return state.inputInterimText;
+  }
+  return committedText;
+}
+
 export function applyTranscriptEvent(
   state: TranscriptState,
   event: TranscriptEvent,
 ): TranscriptTransition {
   switch (event.type) {
+    case "input-activity-start":
+      return {
+        state: {
+          ...state,
+          inputActivityActive: true,
+        },
+        completed: [],
+      };
+
+    case "input-activity-end":
+      return {
+        state: {
+          ...state,
+          inputActivityActive: false,
+        },
+        completed: [],
+      };
+
     case "input-interim": {
       if (!hasMeaningfulText(event.text)) {
         return { state, completed: [] };
       }
 
-      const inputInterimText = event.text;
-      const visibleText = mergeTranscriptText(
-        state.inputFinalText,
-        inputInterimText,
-      );
-      const nextState = upsertStreamingMessage(
-        { ...state, inputInterimText },
-        "user",
-        visibleText,
-        event.at,
-      );
-      return { state: nextState, completed: [] };
+      return {
+        state: upsertStreamingMessage(
+          {
+            ...state,
+            inputInterimText: event.text,
+          },
+          "user",
+          event.text,
+          event.at,
+        ),
+        completed: [],
+      };
     }
 
-    case "input-final": {
+    case "input-transcription": {
+      const inputCommittedText =
+        state.inputCommittedText + event.text;
+
       if (
-        !hasMeaningfulText(event.text) &&
-        !state.inputMessageId &&
-        !hasMeaningfulText(state.inputFinalText)
+        !hasMeaningfulText(inputCommittedText) &&
+        !state.inputMessageId
       ) {
         return { state, completed: [] };
       }
 
-      const inputFinalText = mergeTranscriptText(
-        state.inputFinalText,
-        event.text,
-      );
       const nextState = upsertStreamingMessage(
         {
           ...state,
-          inputFinalText,
+          inputCommittedText,
+          inputInterimText: event.finished
+            ? ""
+            : state.inputInterimText,
+        },
+        "user",
+        visibleInputText(state, inputCommittedText),
+        event.at,
+      );
+
+      if (!event.finished) {
+        return {
+          state: nextState,
+          completed: [],
+        };
+      }
+
+      const committedVisibleState = upsertStreamingMessage(
+        {
+          ...nextState,
           inputInterimText: "",
         },
         "user",
-        inputFinalText,
+        inputCommittedText,
         event.at,
       );
-      return { state: nextState, completed: [] };
+      return finalizeInput(committedVisibleState, event.at);
     }
 
-    case "output-fragment": {
-      if (!hasMeaningfulText(event.text) && !state.outputMessageId) {
+    case "output-transcription": {
+      const outputText = state.outputText + event.text;
+
+      if (!hasMeaningfulText(outputText) && !state.outputMessageId) {
         return { state, completed: [] };
       }
 
-      const userTransition = finalizeInput(state, event.at);
-      const outputText = mergeTranscriptText(
-        userTransition.state.outputText,
-        event.text,
-      );
       const nextState = upsertStreamingMessage(
-        { ...userTransition.state, outputText },
+        {
+          ...state,
+          outputText,
+        },
         "assistant",
         outputText,
         event.at,
       );
 
-      return {
-        state: nextState,
-        completed: userTransition.completed,
-      };
+      return event.finished
+        ? finalizeOutput(nextState, event.at)
+        : { state: nextState, completed: [] };
     }
 
     case "turn-complete": {
-      const userTransition = finalizeInput(state, event.at);
-      const outputTransition = finalizeOutput(userTransition.state, event.at);
+      const inputTransition = state.inputActivityActive
+        ? { state, completed: [] as TranscriptMessage[] }
+        : finalizeInput(state, event.at);
+      const outputTransition = finalizeOutput(
+        inputTransition.state,
+        event.at,
+      );
       return {
         state: outputTransition.state,
         completed: [
-          ...userTransition.completed,
+          ...inputTransition.completed,
           ...outputTransition.completed,
         ],
       };
@@ -277,5 +382,33 @@ export function applyTranscriptEvent(
 
     case "interrupted":
       return finalizeOutput(state, event.at);
+
+    case "session-end": {
+      let inputState = state;
+      let completed: TranscriptMessage[] = [];
+
+      if (hasMeaningfulText(state.inputCommittedText)) {
+        const inputTransition = finalizeInput(inputState, event.at);
+        inputState = inputTransition.state;
+        completed = inputTransition.completed;
+      } else {
+        inputState = removeStreamingMessage(inputState, "user");
+        inputState = {
+          ...inputState,
+          inputCommittedText: "",
+          inputInterimText: "",
+          inputActivityActive: false,
+        };
+      }
+
+      const outputTransition = finalizeOutput(inputState, event.at);
+      return {
+        state: {
+          ...outputTransition.state,
+          inputActivityActive: false,
+        },
+        completed: [...completed, ...outputTransition.completed],
+      };
+    }
   }
 }
