@@ -1,21 +1,21 @@
 import "server-only";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import type { FeedbackProvider } from "@/lib/learning/feedback/service";
 
 export const SESSION_FEEDBACK_RESPONSE_SCHEMA = {
-  type: "object",
+  type: Type.OBJECT,
   properties: {
-    summary: { type: "string" },
+    summary: { type: Type.STRING },
     grammarCorrections: {
-      type: "array",
+      type: Type.ARRAY,
       items: {
-        type: "object",
+        type: Type.OBJECT,
         properties: {
-          original: { type: "string" },
-          corrected: { type: "string" },
-          explanation: { type: "string" },
+          original: { type: Type.STRING },
+          corrected: { type: Type.STRING },
+          explanation: { type: Type.STRING },
           category: {
-            type: "string",
+            type: Type.STRING,
             enum: [
               "articles",
               "verb_tense",
@@ -32,51 +32,51 @@ export const SESSION_FEEDBACK_RESPONSE_SCHEMA = {
       },
     },
     betterSentences: {
-      type: "array",
+      type: Type.ARRAY,
       items: {
-        type: "object",
+        type: Type.OBJECT,
         properties: {
-          original: { type: "string" },
-          suggestion: { type: "string" },
-          reason: { type: "string" },
+          original: { type: Type.STRING },
+          suggestion: { type: Type.STRING },
+          reason: { type: Type.STRING },
         },
         required: ["original", "suggestion"],
       },
     },
     vocabulary: {
-      type: "array",
+      type: Type.ARRAY,
       items: {
-        type: "object",
+        type: Type.OBJECT,
         properties: {
-          term: { type: "string" },
-          meaning: { type: "string" },
-          example: { type: "string" },
+          term: { type: Type.STRING },
+          meaning: { type: Type.STRING },
+          example: { type: Type.STRING },
         },
         required: ["term", "meaning"],
       },
     },
     fluency: {
-      type: "object",
+      type: Type.OBJECT,
       properties: {
-        score: { type: "integer" },
-        summary: { type: "string" },
+        score: { type: Type.INTEGER },
+        summary: { type: Type.STRING },
       },
       required: ["score", "summary"],
     },
     pronunciationNotes: {
-      type: "array",
+      type: Type.ARRAY,
       items: {
-        type: "object",
+        type: Type.OBJECT,
         properties: {
-          term: { type: "string" },
-          note: { type: "string" },
+          term: { type: Type.STRING },
+          note: { type: Type.STRING },
         },
         required: ["note"],
       },
     },
     nextSteps: {
-      type: "array",
-      items: { type: "string" },
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
     },
   },
   required: [
