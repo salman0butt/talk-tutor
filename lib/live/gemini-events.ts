@@ -1,6 +1,7 @@
 import {
   InteractionStatus,
   type LiveServerMessage,
+  VoiceActivityType,
 } from "@google/genai";
 import type { TranscriptEvent } from "./transcript";
 
@@ -17,74 +18,92 @@ export function normalizeGeminiMessage(
   message: LiveServerMessage,
   at: number,
 ): NormalizedGeminiMessage {
-  const serverContent = message.serverContent;
-
-  if (!serverContent) {
-    return {
-      transcriptEvents: [],
-      audioChunks: [],
-      interrupted: false,
-      turnComplete: false,
-      waitingForInput: false,
-      interactionInProgress: false,
-    };
-  }
-
   const transcriptEvents: TranscriptEvent[] = [];
-  const interimInput = serverContent.interimInputTranscription?.text;
-  const finalInput = serverContent.inputTranscription?.text;
-  const outputText = serverContent.outputTranscription?.text;
+  const voiceActivity = message.voiceActivity?.voiceActivityType;
 
-  if (interimInput !== undefined) {
+  if (voiceActivity === VoiceActivityType.ACTIVITY_START) {
     transcriptEvents.push({
-      type: "input-interim",
-      text: interimInput,
+      type: "input-activity-start",
       at,
     });
   }
 
-  if (finalInput !== undefined) {
-    transcriptEvents.push({
-      type: "input-final",
-      text: finalInput,
-      at,
-    });
-  }
-
-  if (outputText !== undefined) {
-    transcriptEvents.push({
-      type: "output-fragment",
-      text: outputText,
-      at,
-    });
-  }
-
-  if (serverContent.interrupted) {
-    transcriptEvents.push({ type: "interrupted", at });
-  }
-
-  if (serverContent.turnComplete) {
-    transcriptEvents.push({ type: "turn-complete", at });
-  }
-
+  const serverContent = message.serverContent;
   const audioChunks: string[] = [];
-  for (const part of serverContent.modelTurn?.parts ?? []) {
-    const inlineData = part.inlineData;
-    if (
-      inlineData?.data &&
-      (!inlineData.mimeType || inlineData.mimeType.startsWith("audio/"))
-    ) {
-      audioChunks.push(inlineData.data);
+
+  if (serverContent) {
+    const interimInput = serverContent.interimInputTranscription?.text;
+    const inputTranscription = serverContent.inputTranscription;
+    const outputTranscription = serverContent.outputTranscription;
+
+    if (interimInput !== undefined) {
+      transcriptEvents.push({
+        type: "input-interim",
+        text: interimInput,
+        at,
+      });
     }
+
+    if (inputTranscription?.text !== undefined || inputTranscription?.finished) {
+      transcriptEvents.push({
+        type: "input-transcription",
+        text: inputTranscription.text ?? "",
+        finished: Boolean(inputTranscription.finished),
+        at,
+      });
+    }
+
+    if (
+      outputTranscription?.text !== undefined ||
+      outputTranscription?.finished
+    ) {
+      transcriptEvents.push({
+        type: "output-transcription",
+        text: outputTranscription.text ?? "",
+        finished: Boolean(outputTranscription.finished),
+        at,
+      });
+    }
+
+    if (serverContent.interrupted) {
+      transcriptEvents.push({
+        type: "interrupted",
+        at,
+      });
+    }
+
+    if (serverContent.turnComplete) {
+      transcriptEvents.push({
+        type: "turn-complete",
+        at,
+      });
+    }
+
+    for (const part of serverContent.modelTurn?.parts ?? []) {
+      const inlineData = part.inlineData;
+      if (
+        inlineData?.data &&
+        (!inlineData.mimeType || inlineData.mimeType.startsWith("audio/"))
+      ) {
+        audioChunks.push(inlineData.data);
+      }
+    }
+  }
+
+  if (voiceActivity === VoiceActivityType.ACTIVITY_END) {
+    transcriptEvents.push({
+      type: "input-activity-end",
+      at,
+    });
   }
 
   return {
     transcriptEvents,
     audioChunks,
-    interrupted: Boolean(serverContent.interrupted),
-    turnComplete: Boolean(serverContent.turnComplete),
-    waitingForInput: Boolean(serverContent.waitingForInput),
+    interrupted: Boolean(serverContent?.interrupted),
+    turnComplete: Boolean(serverContent?.turnComplete),
+    waitingForInput: Boolean(serverContent?.waitingForInput),
     interactionInProgress:
-      serverContent.interactionStatus === InteractionStatus.IN_PROGRESS,
+      serverContent?.interactionStatus === InteractionStatus.IN_PROGRESS,
   };
 }
