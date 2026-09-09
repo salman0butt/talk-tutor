@@ -92,8 +92,9 @@ export function FlashcardReview({\n  initialItems,\n  nextDueAt,\n}: {\n  initia
         <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-300" />
         <h2 className="mt-4 text-2xl font-semibold">Review complete</h2>
         <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-white/40">
-          You are caught up for now. Your next cards will appear when their
-          deterministic review time arrives.
+          {nextDueAt
+            ? `You are caught up for now. The next saved card is scheduled for ${new Date(nextDueAt).toLocaleString()}.`
+            : "You are caught up for now. No future review is currently scheduled."}
         </p>
         <Link
           href="/vocabulary"
