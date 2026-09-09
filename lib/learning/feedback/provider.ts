@@ -91,18 +91,15 @@ export const SESSION_FEEDBACK_RESPONSE_SCHEMA = {
 } as const;
 
 export class GeminiFeedbackProvider implements FeedbackProvider {
-  private readonly ai: GoogleGenAI;
-  private readonly model: string;
-
-  constructor() {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
-    this.ai = new GoogleGenAI({ apiKey });
-    this.model = process.env.GEMINI_FEEDBACK_MODEL?.trim() || "gemini-2.5-flash";
-  }
+  private readonly model =
+    process.env.GEMINI_FEEDBACK_MODEL?.trim() || "gemini-2.5-flash";
 
   async generate({ prompt }: { prompt: string }): Promise<string> {
-    const response = await this.ai.models.generateContent({
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
+
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.generateContent({
       model: this.model,
       contents: prompt,
       config: {
