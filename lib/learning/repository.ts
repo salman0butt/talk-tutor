@@ -6,6 +6,7 @@ import type {
   LearningSessionSummary,
   SessionFeedback,
 } from "@/lib/learning/types";
+import { normalizeDashboardSnapshot } from "@/lib/learning/analytics";
 import { ownedSessionFilter, withAuthenticatedOwner } from "@/lib/learning/ownership";
 import { isUuid } from "@/lib/learning/validation";
 import { readSupabaseJson, supabaseRestFetch } from "@/lib/supabase/rest";
@@ -348,6 +349,7 @@ export class LearningRepository {
       method: "POST",
       body: "{}",
     });
-    return readSupabaseJson<DashboardSnapshot>(response);
+    const payload = await readSupabaseJson<unknown>(response);
+    return normalizeDashboardSnapshot(payload);
   }
 }
