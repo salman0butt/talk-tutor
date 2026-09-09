@@ -15,6 +15,7 @@ import type {
 } from "@/lib/learning/vocabulary";
 import { ownedSessionFilter, withAuthenticatedOwner } from "@/lib/learning/ownership";
 import { isUuid } from "@/lib/learning/validation";
+import type { OnboardingSubmission } from "@/lib/onboarding/submission";
 import { readSupabaseJson, supabaseRestFetch } from "@/lib/supabase/rest";
 
 type ProfileRow = {
@@ -27,6 +28,10 @@ type ProfileRow = {
   timezone: string;
   correction_frequency: LearningProfile["correctionFrequency"];
   conversation_difficulty: LearningProfile["conversationDifficulty"];
+  onboarding_completed_at: string | null;
+  placement_completed_at: string | null;
+  placement_score: number | null;
+  recommended_level: LearningProfile["recommendedLevel"];
   created_at: string;
   updated_at: string;
 };
@@ -118,6 +123,10 @@ function mapProfile(row: ProfileRow): LearningProfile {
     timezone: row.timezone,
     correctionFrequency: row.correction_frequency,
     conversationDifficulty: row.conversation_difficulty,
+    onboardingCompletedAt: row.onboarding_completed_at,
+    placementCompletedAt: row.placement_completed_at,
+    placementScore: row.placement_score,
+    recommendedLevel: row.recommended_level,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -301,6 +310,34 @@ export class LearningRepository {
     return mapProfile(rows[0]);
   }
 
+  async completeOnboarding(
+    input: OnboardingSubmission,
+  ): Promise<LearningProfile> {
+    await this.ensureProfile();
+    const completedAt = new Date().toISOString();
+    const response = await supabaseRestFetch(
+      `profiles?id=eq.${this.userId}`,
+      this.accessToken,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          learning_goal: input.goal,
+          proficiency_level: input.selectedLevel,
+          conversation_difficulty: input.recommendation.difficulty,
+          placement_completed_at: completedAt,
+          placement_score: input.score,
+          recommended_level: input.recommendedLevel,
+          onboarding_completed_at: completedAt,
+          updated_at: completedAt,
+        }),
+        prefer: "return=representation",
+      },
+    );
+    const rows = await readSupabaseJson<ProfileRow[]>(response);
+    if (!rows[0]) throw new Error("Onboarding could not be completed.");
+    return mapProfile(rows[0]);
+  }
+
   async startSession(input: StartLearningSessionInput): Promise<string> {
     const response = await supabaseRestFetch("rpc/start_learning_session", this.accessToken, {
       method: "POST",
@@ -449,33 +486,36 @@ export class LearningRepository {
   async claimFeedbackGeneration(sessionId: string): Promise<boolean> {
     ownedSessionFilter(this.userId, sessionId);
     const response = await supabaseRestFetch(
-      `learning_sessions?id=eq.${sessionId}&user_id=eq.${this.userId}&status=eq.completed&feedback_status=in.(pending,failed)`,
+      "rpc/claim_learning_session_feedback",
       this.accessToken,
       {
-        method: "PATCH",
-        body: JSON.stringify({
-          feedback_status: "processing",
-          updated_at: new Date().toISOString(),
-        }),
-        prefer: "return=representation",
+        method: "POST",
+        body: JSON.stringify({ p_session_id: sessionId }),
       },
     );
-    const rows = await readSupabaseJson<Array<{ id: string }>>(response);
-    return rows.length === 1;
+    return readSupabaseJson<boolean>(response);
   }
 
-  async setFeedbackStatus(sessionId: string, status: LearningSessionSummary["feedbackStatus"]): Promise<void> {
+  async setFeedbackStatus(
+    sessionId: string,
+    status: LearningSessionSummary["feedbackStatus"],
+  ): Promise<void> {
     ownedSessionFilter(this.userId, sessionId);
     const response = await supabaseRestFetch(
-      `learning_sessions?id=eq.${sessionId}&user_id=eq.${this.userId}`,
+      "rpc/set_learning_session_feedback_status",
       this.accessToken,
       {
-        method: "PATCH",
-        body: JSON.stringify({ feedback_status: status, updated_at: new Date().toISOString() }),
-        prefer: "return=minimal",
+        method: "POST",
+        body: JSON.stringify({
+          p_session_id: sessionId,
+          p_status: status,
+        }),
       },
     );
-    if (!response.ok) await readSupabaseJson(response);
+    const updated = await readSupabaseJson<boolean>(response);
+    if (!updated) {
+      throw new Error("Learning session feedback status could not be updated.");
+    }
   }
 
 

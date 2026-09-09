@@ -17,6 +17,7 @@ export function ProfileHydrator({
   conversationDifficulty,
   practiceMode,
   scenarioId,
+  topic,
   targetMistakeCategories,
 }: {
   preferredLanguage: string;
@@ -26,6 +27,7 @@ export function ProfileHydrator({
   conversationDifficulty: ConversationDifficulty;
   practiceMode?: PracticeMode;
   scenarioId?: string;
+  topic?: string;
   targetMistakeCategories?: GrammarCategory[];
 }) {
   const hydratePreferences = useAudioStore((state) => state.hydratePreferences);
@@ -39,6 +41,7 @@ export function ProfileHydrator({
       conversationDifficulty,
       practiceMode,
       scenarioId,
+      topic,
       targetMistakeCategories,
     });
   }, [
@@ -51,6 +54,7 @@ export function ProfileHydrator({
     proficiencyLevel,
     scenarioId,
     targetMistakeCategories,
+    topic,
   ]);
 
   return null;

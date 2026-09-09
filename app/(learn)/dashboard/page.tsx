@@ -13,13 +13,16 @@ import { RecommendedPractice } from "@/components/dashboard/recommended-practice
 import { SkillProgress } from "@/components/dashboard/skill-progress";
 import { VocabularyGrowth } from "@/components/dashboard/vocabulary-growth";
 import { WeeklyPractice } from "@/components/dashboard/weekly-practice";
+import { UsageMeter } from "@/components/billing/usage-meter";
+import { getCurrentEntitlement } from "@/lib/billing/server";
 import { getCurrentUser } from "@/lib/auth";
 import { getDashboardViewModel } from "@/lib/learning/server";
 
 export default async function DashboardPage() {
-  const [user, view] = await Promise.all([
+  const [user, view, entitlement] = await Promise.all([
     getCurrentUser(),
     getDashboardViewModel(),
+    getCurrentEntitlement(),
   ]);
 
   const name =
@@ -109,6 +112,10 @@ export default async function DashboardPage() {
           detail={`${snapshot.vocabularyDue} due now · ${snapshot.newVocabularyThisWeek} new this week`}
           icon={BookOpenCheck}
         />
+      </div>
+
+      <div className="mt-5">
+        <UsageMeter entitlement={entitlement} compact />
       </div>
 
       {snapshot.completedSessions === 0 && (

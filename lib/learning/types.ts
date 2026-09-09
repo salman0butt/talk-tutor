@@ -5,6 +5,7 @@ export const LEARNING_GOALS = [
   "interview_preparation",
   "academic_language",
   "general_fluency",
+  "immigration",
 ] as const;
 
 export const GRAMMAR_CATEGORIES = [
@@ -42,6 +43,10 @@ export interface LearningProfile {
   timezone: string;
   correctionFrequency: CorrectionFrequency;
   conversationDifficulty: ConversationDifficulty;
+  onboardingCompletedAt: string | null;
+  placementCompletedAt: string | null;
+  placementScore: number | null;
+  recommendedLevel: "Basic" | "Intermediate" | "Top Class" | null;
   createdAt: string;
   updatedAt: string;
 }

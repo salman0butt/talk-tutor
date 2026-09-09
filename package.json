@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test tests/learning/*.test.mjs tests/live/*.test.mjs"
+    "test": "node --experimental-strip-types --test tests/billing/*.test.mjs tests/onboarding/*.test.mjs tests/learning/*.test.mjs tests/live/*.test.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.19.0",
