@@ -561,3 +561,51 @@ test('completed messages are released for persistence only in chronological orde
     ],
   );
 });
+
+
+test('next user activity seals a late transcript that arrived after the previous turnComplete', () => {
+  let state = createTranscriptState('late-after-turn-complete');
+  state = applyTranscriptEvent(state, {
+    type: 'input-activity-start',
+    at: 1000,
+  }).state;
+  state = applyTranscriptEvent(state, {
+    type: 'input-activity-end',
+    at: 1010,
+  }).state;
+  state = applyTranscriptEvent(state, {
+    type: 'output-transcription',
+    text: 'Assistant answer',
+    finished: false,
+    at: 1020,
+  }).state;
+
+  const turnComplete = applyTranscriptEvent(state, {
+    type: 'turn-complete',
+    at: 1030,
+  });
+  assert.equal(turnComplete.completed.length, 0);
+
+  const lateInput = applyTranscriptEvent(turnComplete.state, {
+    type: 'input-transcription',
+    text: 'User question',
+    finished: false,
+    at: 1040,
+  });
+  assert.equal(lateInput.completed.length, 0);
+
+  const nextActivity = applyTranscriptEvent(lateInput.state, {
+    type: 'input-activity-start',
+    at: 2000,
+  });
+
+  assert.deepEqual(
+    nextActivity.completed.map(({ speaker, text }) => ({ speaker, text })),
+    [
+      { speaker: 'user', text: 'User question' },
+      { speaker: 'assistant', text: 'Assistant answer' },
+    ],
+  );
+  assert.equal(nextActivity.state.inputActivityActive, true);
+  assert.equal(nextActivity.state.inputActivityStartedAt, 2000);
+});
