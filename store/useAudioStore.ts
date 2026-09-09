@@ -136,19 +136,39 @@ export const useAudioStore = create<AudioStore>()(
                 tutorRole: "",
                 targetMistakeCategories: [],
                 hydratePreferences: (preferences) =>
-                    set((current) => ({
-                        selectedLanguage: preferences.preferredLanguage,
-                        selectedProficiencyLevel: preferences.proficiencyLevel,
-                        selectedAssistantVoice: preferences.preferredVoice,
-                        correctionFrequency: preferences.correctionFrequency,
-                        difficulty: preferences.conversationDifficulty,
-                        practiceMode: preferences.practiceMode ?? current.practiceMode,
-                        scenarioId: preferences.scenarioId ?? current.scenarioId,
-                        targetMistakeCategories:
-                            preferences.targetMistakeCategories ??
-                            current.targetMistakeCategories,
-                        preferenceError: null,
-                    })),
+                    set((current) => {
+                        const scenario = preferences.scenarioId
+                            ? PRACTICE_SCENARIOS.find(
+                                  (candidate) =>
+                                      candidate.id === preferences.scenarioId,
+                              )
+                            : null;
+                        return {
+                            selectedLanguage: preferences.preferredLanguage,
+                            selectedProficiencyLevel: preferences.proficiencyLevel,
+                            selectedAssistantVoice: preferences.preferredVoice,
+                            correctionFrequency: preferences.correctionFrequency,
+                            difficulty: preferences.conversationDifficulty,
+                            practiceMode:
+                                preferences.practiceMode ?? current.practiceMode,
+                            scenarioId:
+                                scenario?.id ??
+                                preferences.scenarioId ??
+                                current.scenarioId,
+                            ...(scenario
+                                ? {
+                                      selectedTopic: scenario.title,
+                                      customScenario: scenario.situation,
+                                      learnerRole: scenario.learnerRole,
+                                      tutorRole: scenario.tutorRole,
+                                  }
+                                : {}),
+                            targetMistakeCategories:
+                                preferences.targetMistakeCategories ??
+                                current.targetMistakeCategories,
+                            preferenceError: null,
+                        };
+                    }),
                 setSelectedLanguage: (language) => {
                     set({ selectedLanguage: language });
                     void persistPreference({ preferredLanguage: language });
@@ -163,14 +183,9 @@ export const useAudioStore = create<AudioStore>()(
                     void persistPreference({ proficiencyLevel: level });
                 },
                 setPracticeMode: (practiceMode) => set({ practiceMode }),
-                setCorrectionFrequency: (correctionFrequency) => {
-                    set({ correctionFrequency });
-                    void persistPreference({ correctionFrequency });
-                },
-                setDifficulty: (difficulty) => {
-                    set({ difficulty });
-                    void persistPreference({ conversationDifficulty: difficulty });
-                },
+                setCorrectionFrequency: (correctionFrequency) =>
+                    set({ correctionFrequency }),
+                setDifficulty: (difficulty) => set({ difficulty }),
                 applyScenario: (scenarioId) => {
                     const scenario = PRACTICE_SCENARIOS.find(
                         (candidate) => candidate.id === scenarioId,
@@ -219,7 +234,10 @@ export const useAudioStore = create<AudioStore>()(
                             tutorRole: state.tutorRole || undefined,
                             correctionFrequency: state.correctionFrequency,
                             difficulty: state.difficulty,
-                            targetMistakeCategories: state.targetMistakeCategories,
+                            targetMistakeCategories:
+                                state.practiceMode === "mistakes"
+                                    ? state.targetMistakeCategories
+                                    : [],
                         });
                     } catch (reason) {
                         set({
@@ -281,72 +299,73 @@ export const useAudioStore = create<AudioStore>()(
                     });
                     set({ sessionRecorder: recorder });
 
-                    let manager = state.liveManagerInstance;
-                    if (!manager) {
-                        manager = new LiveManager(
-                            {
-                                onStateChange: (newState: ConnectionState) =>
-                                    set({
-                                        connectionState: newState,
-                                        agentState:
-                                            newState === ConnectionState.CONNECTED
-                                                ? "listening"
-                                                : newState === ConnectionState.CONNECTING
-                                                  ? "thinking"
-                                                  : null,
-                                    }),
-                                onTranscript: (sender, text, partial) => {
-                                    const newTranscript = [...get().transcript];
-                                    const existingIndex = newTranscript.findIndex(
-                                        (item) => item.sender === sender && item.isPartial,
-                                    );
+                    const manager = new LiveManager(
+                        {
+                            onStateChange: (newState: ConnectionState) =>
+                                set({
+                                    connectionState: newState,
+                                    agentState:
+                                        newState === ConnectionState.CONNECTED
+                                            ? "listening"
+                                            : newState === ConnectionState.CONNECTING
+                                              ? "thinking"
+                                              : null,
+                                }),
+                            onTranscript: (sender, text, partial) => {
+                                const newTranscript = [...get().transcript];
+                                const existingIndex = newTranscript.findIndex(
+                                    (item) => item.sender === sender && item.isPartial,
+                                );
 
-                                    if (existingIndex !== -1) {
-                                        newTranscript[existingIndex] = {
-                                            ...newTranscript[existingIndex],
-                                            text,
-                                            isPartial: partial,
-                                        };
-                                    } else if (text.trim() !== "") {
-                                        newTranscript.push({
-                                            id: `${sender}-${Date.now()}`,
-                                            sender,
-                                            text,
-                                            isPartial: partial,
-                                        });
-                                    }
-                                    set({ transcript: newTranscript });
+                                if (existingIndex !== -1) {
+                                    newTranscript[existingIndex] = {
+                                        ...newTranscript[existingIndex],
+                                        text,
+                                        isPartial: partial,
+                                    };
+                                } else if (text.trim() !== "") {
+                                    newTranscript.push({
+                                        id: `${sender}-${Date.now()}`,
+                                        sender,
+                                        text,
+                                        isPartial: partial,
+                                    });
+                                }
+                                set({ transcript: newTranscript });
 
-                                    if (!partial && text.trim()) {
-                                        const role = sender === "model" ? "assistant" : "user";
-                                        void get()
-                                            .sessionRecorder?.recordFinalTurn(
-                                                role,
-                                                text,
-                                                new Date().toISOString(),
-                                            )
-                                            .catch(reportSessionPersistenceError);
-                                    }
-                                },
-                                onAudioLevel: (level, type) =>
-                                    set((current) => ({
-                                        audioLevel: { ...current.audioLevel, [type]: level },
-                                    })),
-                                onAgentState: (agentState) => set({ agentState }),
-                                onError: (error: string) => set({ error }),
-                                onSessionClosed: () => {
-                                    const activeRecorder = get().sessionRecorder;
-                                    if (activeRecorder) {
-                                        void activeRecorder
-                                            .finalize()
-                                            .catch(reportSessionPersistenceError);
-                                    }
-                                },
+                                if (!partial && text.trim()) {
+                                    const role =
+                                        sender === "model" ? "assistant" : "user";
+                                    void get()
+                                        .sessionRecorder?.recordFinalTurn(
+                                            role,
+                                            text,
+                                            new Date().toISOString(),
+                                        )
+                                        .catch(reportSessionPersistenceError);
+                                }
                             },
-                            token.name,
-                        );
-                        set({ liveManagerInstance: manager });
-                    }
+                            onAudioLevel: (level, type) =>
+                                set((current) => ({
+                                    audioLevel: {
+                                        ...current.audioLevel,
+                                        [type]: level,
+                                    },
+                                })),
+                            onAgentState: (agentState) => set({ agentState }),
+                            onError: (error: string) => set({ error }),
+                            onSessionClosed: () => {
+                                const activeRecorder = get().sessionRecorder;
+                                if (activeRecorder) {
+                                    void activeRecorder
+                                        .finalize()
+                                        .catch(reportSessionPersistenceError);
+                                }
+                            },
+                        },
+                        token.name,
+                    );
+                    set({ liveManagerInstance: manager });
 
                     await manager.startSession({
                         selected_topic: practiceConfig.topic,
