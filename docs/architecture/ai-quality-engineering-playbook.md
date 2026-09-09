@@ -669,11 +669,17 @@ Do not add embeddings/vector search merely because session history exists.
 
 Every offline AI request should have a finite timeout.
 
+The current post-session feedback request uses a 60-second timeout. Gemini 2.5
+Flash also receives an explicit bounded thinking budget so its default dynamic
+thinking cannot consume an unbounded share of a small structured-output
+request.
+
 Why:
 
 - providers can hang/degrade;
 - server resources must be bounded;
-- UX needs predictable failure.
+- UX needs predictable failure;
+- reasoning-model defaults should be made explicit for production workloads.
 
 ### Retry
 

@@ -19,7 +19,14 @@ export function FeedbackRetryButton({ sessionId }: { sessionId: string }) {
       );
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
-        throw new Error(payload?.error ?? "Feedback retry failed.");
+        const detail =
+          process.env.NODE_ENV === "development" &&
+          typeof payload?.detail === "string"
+            ? ` ${payload.detail}`
+            : "";
+        throw new Error(
+          `${payload?.error ?? "Feedback retry failed."}${detail}`,
+        );
       }
       router.refresh();
     } catch (reason) {
