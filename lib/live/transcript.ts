@@ -90,9 +90,24 @@ function insertStreamingMessage(
     startedAt,
   };
   const messages = [...state.messages];
-  const insertionIndex = messages.findIndex(
+  let insertionIndex = messages.findIndex(
     (candidate) => candidate.startedAt > startedAt,
   );
+
+  if (
+    speaker === "user" &&
+    state.inputActivityStartedAt === null &&
+    state.outputMessageId
+  ) {
+    const streamingAssistantIndex = messages.findIndex(
+      (candidate) =>
+        candidate.id === state.outputMessageId &&
+        candidate.status === "streaming",
+    );
+    if (streamingAssistantIndex !== -1) {
+      insertionIndex = streamingAssistantIndex;
+    }
+  }
 
   if (insertionIndex === -1) {
     messages.push(message);
