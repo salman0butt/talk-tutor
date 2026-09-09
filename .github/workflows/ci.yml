@@ -3,12 +3,10 @@ name: Learning Platform CI
 on:
   push:
     branches:
-      - feat/personalized-learning-vocabulary
-      - fix/tutor-live-voice-transcript
+      - main
   pull_request:
     branches:
       - main
-      - feat/personalized-learning-vocabulary
 
 permissions:
   contents: read
