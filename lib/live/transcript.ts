@@ -22,6 +22,8 @@ export interface TranscriptState {
   inputActivityActive: boolean;
   inputActivityStartedAt: number | null;
   pendingInputBoundary: boolean;
+  currentTurnHasUserInput: boolean;
+  implicitInputReservation: boolean;
   releasedMessageIds: string[];
 }
 
@@ -63,6 +65,8 @@ export function createTranscriptState(sessionId: string): TranscriptState {
     inputActivityActive: false,
     inputActivityStartedAt: null,
     pendingInputBoundary: false,
+    currentTurnHasUserInput: false,
+    implicitInputReservation: false,
     releasedMessageIds: [],
   };
 }
@@ -97,7 +101,7 @@ function insertStreamingMessage(
   );
 
   if (speaker === "user" && state.inputActivityStartedAt === null) {
-    if (state.pendingInputBoundary) {
+    if (state.pendingInputBoundary || state.implicitInputReservation) {
       const released = new Set(state.releasedMessageIds);
       const pendingAssistantIndex = messages.findIndex(
         (candidate) =>
@@ -245,6 +249,7 @@ function completeSpeaker(
       inputInterimText: "",
       inputActivityStartedAt: null,
       pendingInputBoundary: false,
+      implicitInputReservation: false,
     };
   }
 
@@ -264,7 +269,7 @@ function releaseReadyMessages(state: TranscriptState): TranscriptTransition {
       ? state.inputActivityStartedAt
       : null;
   const hasImplicitInputReservation =
-    state.pendingInputBoundary &&
+    (state.pendingInputBoundary || state.implicitInputReservation) &&
     state.inputActivityStartedAt === null &&
     !state.inputMessageId;
 
@@ -343,6 +348,8 @@ export function applyTranscriptEvent(
         inputActivityActive: true,
         inputActivityStartedAt: event.at,
         pendingInputBoundary: false,
+        currentTurnHasUserInput: true,
+        implicitInputReservation: false,
       };
       break;
     }
@@ -364,6 +371,11 @@ export function applyTranscriptEvent(
           ...state,
           inputInterimText: event.text,
           inputActivityStartedAt: state.inputActivityStartedAt ?? event.at,
+          currentTurnHasUserInput:
+            state.pendingInputBoundary
+              ? state.currentTurnHasUserInput
+              : true,
+          implicitInputReservation: false,
         },
         "user",
         event.text,
@@ -389,6 +401,11 @@ export function applyTranscriptEvent(
           inputInterimText: event.finished
             ? ""
             : state.inputInterimText,
+          currentTurnHasUserInput:
+            state.pendingInputBoundary
+              ? state.currentTurnHasUserInput
+              : true,
+          implicitInputReservation: false,
         },
         "user",
         visibleInputText(state, inputCommittedText),
@@ -421,10 +438,10 @@ export function applyTranscriptEvent(
         {
           ...state,
           outputText,
-          pendingInputBoundary:
-            state.pendingInputBoundary ||
-            (!state.inputMessageId &&
-              state.inputActivityStartedAt === null),
+          implicitInputReservation:
+            state.implicitInputReservation ||
+            (!state.currentTurnHasUserInput &&
+              !state.pendingInputBoundary),
         },
         "assistant",
         outputText,
@@ -439,18 +456,41 @@ export function applyTranscriptEvent(
 
     case "turn-complete":
       if (state.inputActivityActive) {
-        nextState = state;
+        nextState = completeSpeaker(state, "assistant", event.at);
       } else if (state.inputMessageId) {
         nextState = completeSpeaker(state, "user", event.at);
-      } else {
+        nextState = completeSpeaker(nextState, "assistant", event.at);
         nextState = {
-          ...state,
-          pendingInputBoundary:
-            state.pendingInputBoundary ||
-            state.inputActivityStartedAt !== null,
+          ...nextState,
+          currentTurnHasUserInput: false,
+          implicitInputReservation: false,
+          pendingInputBoundary: false,
+        };
+      } else if (state.inputActivityStartedAt !== null) {
+        nextState = completeSpeaker(state, "assistant", event.at);
+        nextState = {
+          ...nextState,
+          currentTurnHasUserInput: false,
+          implicitInputReservation: false,
+          pendingInputBoundary: true,
+        };
+      } else if (state.currentTurnHasUserInput) {
+        nextState = completeSpeaker(state, "assistant", event.at);
+        nextState = {
+          ...nextState,
+          currentTurnHasUserInput: false,
+          implicitInputReservation: false,
+          pendingInputBoundary: false,
+        };
+      } else {
+        nextState = completeSpeaker(state, "assistant", event.at);
+        nextState = {
+          ...nextState,
+          currentTurnHasUserInput: false,
+          implicitInputReservation: false,
+          pendingInputBoundary: true,
         };
       }
-      nextState = completeSpeaker(nextState, "assistant", event.at);
       break;
 
     case "interrupted":
@@ -475,6 +515,8 @@ export function applyTranscriptEvent(
         inputActivityActive: false,
         inputActivityStartedAt: null,
         pendingInputBoundary: false,
+        currentTurnHasUserInput: false,
+        implicitInputReservation: false,
       };
       break;
   }
