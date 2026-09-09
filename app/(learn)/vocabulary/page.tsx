@@ -46,7 +46,13 @@ export default async function VocabularyPage() {
         ))}
       </div>
 
-      {overview.due === 0 && overview.nextDueAt && (\n        <p className="mt-4 text-xs text-white/30">\n          Next scheduled review: {new Date(overview.nextDueAt).toLocaleString()}\n        </p>\n      )}\n\n      {items.length === 0 ? (
+      {overview.due === 0 && overview.nextDueAt && (
+        <p className="mt-4 text-xs text-white/30">
+          Next scheduled review: {new Date(overview.nextDueAt).toLocaleString()}
+        </p>
+      )}
+
+      {items.length === 0 ? (
         <section className="mt-8 rounded-3xl border border-white/[0.08] bg-white/[0.025] p-8 text-center sm:p-12">
           <h2 className="text-xl font-semibold">Your vocabulary library is empty.</h2>
           <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-white/40">
