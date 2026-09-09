@@ -5,6 +5,7 @@ import type {
   LearningProfilePatch,
   LearningSessionSummary,
   SessionFeedback,
+  SessionStartInput,
 } from "@/lib/learning/types";
 import { normalizeDashboardSnapshot } from "@/lib/learning/analytics";
 import { ownedSessionFilter, withAuthenticatedOwner } from "@/lib/learning/ownership";
@@ -19,6 +20,8 @@ type ProfileRow = {
   learning_goal: LearningProfile["learningGoal"];
   daily_practice_target_minutes: number;
   timezone: string;
+  correction_frequency: LearningProfile["correctionFrequency"];
+  conversation_difficulty: LearningProfile["conversationDifficulty"];
   created_at: string;
   updated_at: string;
 };
@@ -34,6 +37,12 @@ type SessionRow = {
   duration_seconds: number;
   status: LearningSessionSummary["status"];
   feedback_status: LearningSessionSummary["feedbackStatus"];
+  practice_mode?: LearningSessionSummary["practiceMode"];
+  scenario_id?: string | null;
+  custom_scenario?: string | null;
+  learner_role?: string | null;
+  tutor_role?: string | null;
+  target_mistake_categories?: LearningSessionSummary["targetMistakeCategories"];
 };
 
 type FeedbackRow = {
@@ -47,13 +56,7 @@ type FeedbackRow = {
   next_steps: SessionFeedback["nextSteps"];
 };
 
-export type StartLearningSessionInput = {
-  language: string;
-  proficiencyLevel: string;
-  topic: string;
-  assistantVoice: string;
-  messages: FinalTranscriptMessage[];
-};
+export type StartLearningSessionInput = SessionStartInput;
 
 export type FinalizedSession = {
   id: string;
@@ -73,6 +76,8 @@ function mapProfile(row: ProfileRow): LearningProfile {
     learningGoal: row.learning_goal,
     dailyPracticeTargetMinutes: row.daily_practice_target_minutes,
     timezone: row.timezone,
+    correctionFrequency: row.correction_frequency,
+    conversationDifficulty: row.conversation_difficulty,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -90,6 +95,12 @@ function mapSession(row: SessionRow): LearningSessionSummary {
     durationSeconds: row.duration_seconds,
     status: row.status,
     feedbackStatus: row.feedback_status,
+    practiceMode: row.practice_mode,
+    scenarioId: row.scenario_id ?? null,
+    customScenario: row.custom_scenario ?? null,
+    learnerRole: row.learner_role ?? null,
+    tutorRole: row.tutor_role ?? null,
+    targetMistakeCategories: row.target_mistake_categories ?? [],
     userMessageCount: 0,
   };
 }
@@ -114,6 +125,8 @@ function profilePatchRow(patch: LearningProfilePatch) {
     ...(patch.learningGoal !== undefined ? { learning_goal: patch.learningGoal } : {}),
     ...(patch.dailyPracticeTargetMinutes !== undefined ? { daily_practice_target_minutes: patch.dailyPracticeTargetMinutes } : {}),
     ...(patch.timezone !== undefined ? { timezone: patch.timezone } : {}),
+    ...(patch.correctionFrequency !== undefined ? { correction_frequency: patch.correctionFrequency } : {}),
+    ...(patch.conversationDifficulty !== undefined ? { conversation_difficulty: patch.conversationDifficulty } : {}),
     updated_at: new Date().toISOString(),
   };
 }
@@ -184,6 +197,12 @@ export class LearningRepository {
         p_topic: input.topic,
         p_assistant_voice: input.assistantVoice,
         p_messages: input.messages,
+        p_practice_mode: input.practiceMode,
+        p_scenario_id: input.scenarioId ?? null,
+        p_custom_scenario: input.customScenario ?? null,
+        p_learner_role: input.learnerRole ?? null,
+        p_tutor_role: input.tutorRole ?? null,
+        p_target_mistake_categories: input.targetMistakeCategories,
       }),
     });
     const id = await readSupabaseJson<string>(response);
@@ -219,7 +238,7 @@ export class LearningRepository {
   async listSessions(limit = 30): Promise<LearningSessionSummary[]> {
     const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
     const response = await supabaseRestFetch(
-      `learning_sessions?select=id,language,proficiency_level,topic,assistant_voice,started_at,ended_at,duration_seconds,status,feedback_status&user_id=eq.${this.userId}&status=eq.completed&order=ended_at.desc.nullslast&limit=${safeLimit}`,
+      `learning_sessions?select=id,language,proficiency_level,topic,assistant_voice,started_at,ended_at,duration_seconds,status,feedback_status,practice_mode,scenario_id,custom_scenario,learner_role,tutor_role,target_mistake_categories&user_id=eq.${this.userId}&status=eq.completed&order=ended_at.desc.nullslast&limit=${safeLimit}`,
       this.accessToken,
     );
     const rows = await readSupabaseJson<SessionRow[]>(response);
@@ -255,7 +274,7 @@ export class LearningRepository {
   async getSession(sessionId: string): Promise<LearningSessionSummary | null> {
     const filter = ownedSessionFilter(this.userId, sessionId);
     const response = await supabaseRestFetch(
-      `learning_sessions?select=id,language,proficiency_level,topic,assistant_voice,started_at,ended_at,duration_seconds,status,feedback_status&${new URLSearchParams(filter).toString()}&limit=1`,
+      `learning_sessions?select=id,language,proficiency_level,topic,assistant_voice,started_at,ended_at,duration_seconds,status,feedback_status,practice_mode,scenario_id,custom_scenario,learner_role,tutor_role,target_mistake_categories&${new URLSearchParams(filter).toString()}&limit=1`,
       this.accessToken,
     );
     const rows = await readSupabaseJson<SessionRow[]>(response);
