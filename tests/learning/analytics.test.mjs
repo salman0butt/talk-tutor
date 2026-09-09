@@ -9,6 +9,7 @@ import {
   aggregateCommonMistakes,
   summarizeFluencyTrend,
   normalizeDashboardSnapshot,
+  buildWeeklyPracticeSeries,
 } from '../../lib/learning/analytics.ts';
 
 function session(endedAt, overrides = {}) {
@@ -169,5 +170,24 @@ test('dashboard snapshot normalization rejects malformed metrics without inventi
       recentScores: [70],
       practiceDates: ['2026-09-09'],
     },
+  );
+});
+
+test('weekly practice series fills missing local dates with zero minutes', () => {
+  assert.deepEqual(
+    buildWeeklyPracticeSeries(
+      [
+        { date: '2026-09-07', minutes: 12 },
+        { date: '2026-09-09', minutes: 18 },
+      ],
+      '2026-09-09',
+      4,
+    ),
+    [
+      { date: '2026-09-06', minutes: 0 },
+      { date: '2026-09-07', minutes: 12 },
+      { date: '2026-09-08', minutes: 0 },
+      { date: '2026-09-09', minutes: 18 },
+    ],
   );
 });
