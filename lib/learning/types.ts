@@ -105,6 +105,8 @@ export interface LearningSessionSummary {
   status: SessionStatus;
   feedbackStatus: FeedbackStatus;
   practiceMode?: PracticeMode;
+  correctionFrequency?: CorrectionFrequency;
+  conversationDifficulty?: ConversationDifficulty;
   scenarioId?: string | null;
   customScenario?: string | null;
   learnerRole?: string | null;
