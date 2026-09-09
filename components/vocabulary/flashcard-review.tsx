@@ -23,6 +23,7 @@ export function FlashcardReview({\n  initialItems,\n  nextDueAt,\n}: {\n  initia
   const [revealed, setRevealed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [nextScheduledAt, setNextScheduledAt] = useState(nextDueAt);
 
   const current = items[0];
   const completed = initialItems.length - items.length;
@@ -44,6 +45,18 @@ export function FlashcardReview({\n  initialItems,\n  nextDueAt,\n}: {\n  initia
         const payload = await response.json().catch(() => null);
         if (!response.ok) {
           throw new Error(payload?.error ?? "Could not save this review.");
+        }
+        const candidate = payload?.review?.nextReviewAt;
+        if (
+          typeof candidate === "string" &&
+          !Number.isNaN(Date.parse(candidate))
+        ) {
+          setNextScheduledAt((existing) => {
+            if (!existing || Number.isNaN(Date.parse(existing))) return candidate;
+            return Date.parse(candidate) < Date.parse(existing)
+              ? candidate
+              : existing;
+          });
         }
         setItems((existing) => existing.slice(1));
         setRevealed(false);
@@ -92,8 +105,8 @@ export function FlashcardReview({\n  initialItems,\n  nextDueAt,\n}: {\n  initia
         <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-300" />
         <h2 className="mt-4 text-2xl font-semibold">Review complete</h2>
         <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-white/40">
-          {nextDueAt
-            ? `You are caught up for now. The next saved card is scheduled for ${new Date(nextDueAt).toLocaleString()}.`
+          {nextScheduledAt
+            ? `You are caught up for now. The next saved card is scheduled for ${new Date(nextScheduledAt).toLocaleString()}.`
             : "You are caught up for now. No future review is currently scheduled."}
         </p>
         <Link
