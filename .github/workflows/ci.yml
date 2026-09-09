@@ -72,6 +72,7 @@ jobs:
         run: |
           psql -v ON_ERROR_STOP=1 -f supabase/tests/bootstrap_ci.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260909000000_learning_platform.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260909090000_personalized_learning_vocabulary.sql
           psql -v ON_ERROR_STOP=1 -f supabase/tests/learning_platform_schema.sql
           psql -v ON_ERROR_STOP=1 -f supabase/tests/learning_platform_rls_runtime.sql
           psql -v ON_ERROR_STOP=1 -f supabase/tests/personalized_learning_schema.sql
