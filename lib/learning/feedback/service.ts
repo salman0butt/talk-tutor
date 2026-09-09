@@ -96,6 +96,13 @@ export function buildFeedbackPrompt(input: {
   ].join("\n");
 }
 
+export function groundSessionFeedback(
+  feedback: SessionFeedback,
+  transcript: FinalTranscriptMessage[],
+): SessionFeedback {
+  return applyFeedbackGuardrails(feedback, transcript).feedback;
+}
+
 export class FeedbackService {
   private readonly repository: FeedbackRepository;
   private readonly provider: FeedbackProvider;
