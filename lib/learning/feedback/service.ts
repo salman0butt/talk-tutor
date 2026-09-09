@@ -1,5 +1,5 @@
-import type { FeedbackStatus, FinalTranscriptMessage, SessionFeedback } from "@/lib/learning/types";
-import { parseSessionFeedback } from "@/lib/learning/validation";
+import type { FeedbackStatus, FinalTranscriptMessage, SessionFeedback } from "../types.ts";
+import { parseSessionFeedback } from "../validation.ts";
 
 const MAX_FEEDBACK_TURNS = 80;
 const MAX_FEEDBACK_TEXT_CHARS = 24000;
