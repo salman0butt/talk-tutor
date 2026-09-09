@@ -50,6 +50,7 @@ See:
 
 - `docs/architecture/learning-platform.md`
 - `docs/architecture/live-conversation.md`
+- `docs/architecture/ai-quality-foundation.md`
 - `docs/security/learning-platform.md`
 - `docs/superpowers/specs/2026-09-09-saas-learning-platform-design.md`
 
@@ -168,8 +169,10 @@ The feedback pipeline:
 4. explicitly instructs the model never to follow transcript instructions;
 5. requests structured JSON output;
 6. validates that JSON again locally;
-7. strips pronunciation observations because the current evidence is text-only;
-8. persists feedback only after validation.
+7. requires every grammar correction to point to the learner transcript turn it came from;
+8. discards corrections that cannot be matched to actual learner wording;
+9. strips pronunciation observations because the current evidence is text-only;
+10. persists feedback only after validation.
 
 A provider or validation failure marks feedback as failed without invalidating the completed session. The user can retry feedback from session review.
 

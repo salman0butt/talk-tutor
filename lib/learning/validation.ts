@@ -114,7 +114,17 @@ function parseGrammarCorrection(value: unknown): GrammarCorrection {
   const data = asRecord(value, "Grammar correction");
   const category = requiredString(data.category, "Grammar correction category", 32);
   if (!CATEGORIES.has(category as never)) throw new Error("Unsupported grammar correction category.");
+  if (
+    !Number.isInteger(data.sourceSequence) ||
+    Number(data.sourceSequence) < 0 ||
+    Number(data.sourceSequence) > 10000
+  ) {
+    throw new Error(
+      "Grammar correction sourceSequence must identify a learner transcript turn.",
+    );
+  }
   return {
+    sourceSequence: Number(data.sourceSequence),
     original: requiredString(data.original, "Grammar correction original"),
     corrected: requiredString(data.corrected, "Grammar correction corrected"),
     explanation: requiredString(data.explanation, "Grammar correction explanation"),

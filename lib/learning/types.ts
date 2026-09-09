@@ -70,6 +70,11 @@ export interface FinalTranscriptMessage {
 }
 
 export interface GrammarCorrection {
+  /**
+   * Finalized learner transcript turn that contains the evidence for this
+   * correction. Optional so historical persisted feedback remains readable.
+   */
+  sourceSequence?: number;
   original: string;
   corrected: string;
   explanation: string;

@@ -2,6 +2,9 @@ import "server-only";
 import { GoogleGenAI, Type } from "@google/genai";
 import type { FeedbackProvider } from "@/lib/learning/feedback/service";
 
+const FEEDBACK_REQUEST_TIMEOUT_MS = 30_000;
+const FEEDBACK_MAX_OUTPUT_TOKENS = 4_096;
+
 export const SESSION_FEEDBACK_RESPONSE_SCHEMA = {
   type: Type.OBJECT,
   properties: {
@@ -11,6 +14,7 @@ export const SESSION_FEEDBACK_RESPONSE_SCHEMA = {
       items: {
         type: Type.OBJECT,
         properties: {
+          sourceSequence: { type: Type.INTEGER },
           original: { type: Type.STRING },
           corrected: { type: Type.STRING },
           explanation: { type: Type.STRING },
@@ -28,7 +32,13 @@ export const SESSION_FEEDBACK_RESPONSE_SCHEMA = {
             ],
           },
         },
-        required: ["original", "corrected", "explanation", "category"],
+        required: [
+          "sourceSequence",
+          "original",
+          "corrected",
+          "explanation",
+          "category",
+        ],
       },
     },
     betterSentences: {
@@ -113,6 +123,8 @@ export class GeminiFeedbackProvider implements FeedbackProvider {
         responseMimeType: "application/json",
         responseSchema: SESSION_FEEDBACK_RESPONSE_SCHEMA,
         temperature: 0.2,
+        maxOutputTokens: FEEDBACK_MAX_OUTPUT_TOKENS,
+        httpOptions: { timeout: FEEDBACK_REQUEST_TIMEOUT_MS },
       },
     });
 
