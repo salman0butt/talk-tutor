@@ -449,33 +449,36 @@ export class LearningRepository {
   async claimFeedbackGeneration(sessionId: string): Promise<boolean> {
     ownedSessionFilter(this.userId, sessionId);
     const response = await supabaseRestFetch(
-      `learning_sessions?id=eq.${sessionId}&user_id=eq.${this.userId}&status=eq.completed&feedback_status=in.(pending,failed)`,
+      "rpc/claim_learning_session_feedback",
       this.accessToken,
       {
-        method: "PATCH",
-        body: JSON.stringify({
-          feedback_status: "processing",
-          updated_at: new Date().toISOString(),
-        }),
-        prefer: "return=representation",
+        method: "POST",
+        body: JSON.stringify({ p_session_id: sessionId }),
       },
     );
-    const rows = await readSupabaseJson<Array<{ id: string }>>(response);
-    return rows.length === 1;
+    return readSupabaseJson<boolean>(response);
   }
 
-  async setFeedbackStatus(sessionId: string, status: LearningSessionSummary["feedbackStatus"]): Promise<void> {
+  async setFeedbackStatus(
+    sessionId: string,
+    status: LearningSessionSummary["feedbackStatus"],
+  ): Promise<void> {
     ownedSessionFilter(this.userId, sessionId);
     const response = await supabaseRestFetch(
-      `learning_sessions?id=eq.${sessionId}&user_id=eq.${this.userId}`,
+      "rpc/set_learning_session_feedback_status",
       this.accessToken,
       {
-        method: "PATCH",
-        body: JSON.stringify({ feedback_status: status, updated_at: new Date().toISOString() }),
-        prefer: "return=minimal",
+        method: "POST",
+        body: JSON.stringify({
+          p_session_id: sessionId,
+          p_status: status,
+        }),
       },
     );
-    if (!response.ok) await readSupabaseJson(response);
+    const updated = await readSupabaseJson<boolean>(response);
+    if (!updated) {
+      throw new Error("Learning session feedback status could not be updated.");
+    }
   }
 
 
