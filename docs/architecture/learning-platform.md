@@ -150,7 +150,7 @@ atomic pending/failed → processing claim
   ↓
 load persisted transcript
   ↓
-bounded untrusted-data prompt
+system instruction + bounded untrusted transcript payload
   ↓
 Gemini JSON schema
   ↓
