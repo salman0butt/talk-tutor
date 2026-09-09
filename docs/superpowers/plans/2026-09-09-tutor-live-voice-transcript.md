@@ -90,7 +90,7 @@
 - The store persists only messages returned as newly completed by the reducer.
 
 - [ ] Map `interimInputTranscription`, `inputTranscription`, `outputTranscription`, `turnComplete`, and `interrupted` to normalized transcript events.
-- [ ] Ensure first assistant output finalizes the current user turn.
+- [ ] Preserve independent input/output transcription ordering; finalize with optional `finished`, guarded `turnComplete`, next-input, and session-end boundaries.
 - [ ] Ensure model turn completion finalizes assistant output once.
 - [ ] Ensure interrupted assistant text remains coherent and is not duplicated.
 - [ ] Reset transcript session identity on each new connection.
@@ -107,12 +107,12 @@
 **Interfaces:**
 - Store owns `selectedInputDeviceId`.
 - `ConnectConfig.input_device_id` is optional.
-- Worklet posts approximately 20 ms Float32 chunks.
+- Worklet posts approximately 40 ms Float32 chunks.
 
 - [ ] Wire `MicSelector` to the store/global mute state rather than a disconnected local-only mute prop.
 - [ ] Pass selected device to `getUserMedia`.
 - [ ] Use actual input `AudioContext.sampleRate` when creating PCM blobs.
-- [ ] Batch worklet render quanta into about 20 ms messages.
+- [ ] Batch worklet render quanta into about 40 ms messages.
 - [ ] Clear/close worklet callbacks and ports during cleanup.
 
 ### Task 6: Serialize output audio and make interruption stale-safe
