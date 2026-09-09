@@ -8,7 +8,16 @@ import { useRouter } from "next/navigation";
 import LeftSidebar from "@/components/left-sidebar";
 import RightSidebar from "@/components/right-sidebar";
 
-import { LoaderCircle, LogOut, LucideLanguages, Settings2 } from "lucide-react";
+import {
+  BookOpenText,
+  LayoutDashboard,
+  LoaderCircle,
+  LogOut,
+  LucideLanguages,
+  Menu,
+  Settings2,
+  UserRound,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 import {
@@ -39,7 +48,59 @@ export function Navbar({ userEmail }: { userEmail?: string }) {
   return (
     <header className="relative z-50 w-full border-b bg-background/90 backdrop-blur">
       <div className="relative flex h-16 items-center px-4 md:px-6">
-        <div className="flex items-center">
+        <div className="flex items-center gap-1">
+          <div className="lg:hidden">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9">
+                  <Menu className="h-5 w-5" />
+                  <span className="sr-only">Open learning navigation</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-72">
+                <SheetHeader>
+                  <SheetTitle>Talk Tutor</SheetTitle>
+                  <SheetDescription>Navigate your learning workspace</SheetDescription>
+                </SheetHeader>
+                <nav className="mt-6 grid gap-2" aria-label="Learning navigation">
+                  <Link href="/dashboard" className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <LayoutDashboard className="h-4 w-4" />
+                    Dashboard
+                  </Link>
+                  <Link href="/history" className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <BookOpenText className="h-4 w-4" />
+                    History
+                  </Link>
+                  <Link href="/profile" className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <UserRound className="h-4 w-4" />
+                    Profile
+                  </Link>
+                </nav>
+              </SheetContent>
+            </Sheet>
+          </div>
+
+          <nav className="hidden items-center gap-1 lg:flex" aria-label="Learning navigation">
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/dashboard">
+                <LayoutDashboard className="h-4 w-4" />
+                Dashboard
+              </Link>
+            </Button>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/history">
+                <BookOpenText className="h-4 w-4" />
+                History
+              </Link>
+            </Button>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/profile">
+                <UserRound className="h-4 w-4" />
+                Profile
+              </Link>
+            </Button>
+          </nav>
+
           <div className="lg:hidden">
             <Sheet>
               <SheetTrigger asChild>
@@ -60,7 +121,7 @@ export function Navbar({ userEmail }: { userEmail?: string }) {
         </div>
 
         <Link
-          href="/"
+          href="/dashboard"
           className="absolute left-1/2 flex -translate-x-1/2 items-center gap-3"
         >
           <div className="relative h-11 w-11 overflow-hidden rounded-md">
