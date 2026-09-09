@@ -70,6 +70,12 @@ test('input transcription deltas append and finished commits the user turn', () 
 test('assistant transcription deltas stream in one row and finished commits once', () => {
   let state = createTranscriptState('output-deltas');
   state = applyTranscriptEvent(state, {
+    type: 'input-transcription',
+    text: 'Hi',
+    finished: true,
+    at: 990,
+  }).state;
+  state = applyTranscriptEvent(state, {
     type: 'output-transcription',
     text: 'Hello',
     finished: false,
@@ -225,6 +231,12 @@ test('user and assistant turns remain chronological across multiple turns', () =
 
 test('interruption finalizes observed assistant text without duplicating it', () => {
   let state = createTranscriptState('session-interrupted');
+  state = applyTranscriptEvent(state, {
+    type: 'input-transcription',
+    text: 'How should I say it?',
+    finished: true,
+    at: 990,
+  }).state;
   state = applyTranscriptEvent(state, {
     type: 'output-transcription',
     text: 'You could say',
