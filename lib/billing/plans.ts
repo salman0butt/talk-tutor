@@ -49,5 +49,6 @@ export function planAllowanceSeconds(planId: PlanId): number {
 }
 
 export function listPlanDefinitions(): PlanDefinition[] {
-  return ["free", ...PAID_PLAN_IDS].map((id) => PLAN_DEFINITIONS[id]);
+  const planIds: PlanId[] = ["free", ...PAID_PLAN_IDS];
+  return planIds.map((id) => PLAN_DEFINITIONS[id]);
 }
