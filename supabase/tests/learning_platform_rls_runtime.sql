@@ -155,7 +155,7 @@ select public.start_learning_session(
   '[{"role":"user","sequence":0,"text":"Hello","occurredAt":"2026-09-09T05:00:00Z"}]'::jsonb
 );
 
-do $
+do $$
 declare
   v_owned_sessions integer;
   v_owned_messages integer;
@@ -173,6 +173,6 @@ begin
     raise exception 'start_learning_session did not derive auth.uid ownership';
   end if;
 end
-$;
+$$;
 
 reset role;
