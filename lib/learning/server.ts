@@ -68,6 +68,26 @@ export async function getDashboardViewModel() {
 }
 
 
+
+export async function getVocabularyViewModel() {
+  const repository = await requireLearningRepository();
+  const [profile, overview, items] = await Promise.all([
+    repository.ensureProfile(),
+    repository.getVocabularyOverview(),
+    repository.listVocabularyItems(100),
+  ]);
+  return { profile, overview, items };
+}
+
+export async function getVocabularyReviewViewModel() {
+  const repository = await requireLearningRepository();
+  const [profile, items] = await Promise.all([
+    repository.ensureProfile(),
+    repository.listDueVocabulary(50),
+  ]);
+  return { profile, items };
+}
+
 export async function getHistoryViewModel() {
   const repository = await requireLearningRepository();
   const [profile, sessions] = await Promise.all([
