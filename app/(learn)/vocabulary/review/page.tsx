@@ -4,7 +4,7 @@ import { FlashcardReview } from "@/components/vocabulary/flashcard-review";
 import { getVocabularyReviewViewModel } from "@/lib/learning/server";
 
 export default async function VocabularyReviewPage() {
-  const { items } = await getVocabularyReviewViewModel();
+  const { overview, items } = await getVocabularyReviewViewModel();
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -26,7 +26,7 @@ export default async function VocabularyReviewPage() {
         </p>
       </div>
       <div className="mt-8">
-        <FlashcardReview initialItems={items} />
+        <FlashcardReview initialItems={items} nextDueAt={overview.nextDueAt} />
       </div>
     </div>
   );
