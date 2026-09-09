@@ -7,6 +7,7 @@ import { MicSelector } from "@/components/ui/mic-selector";
 import { cn } from "@/lib/utils";
 import { useAudioStore } from "@/store/useAudioStore";
 import { ConnectionState } from "@/types";
+import { useShallow } from "zustand/react/shallow";
 
 function ControlsPanel() {
   const {
@@ -17,7 +18,17 @@ function ControlsPanel() {
     toggleMute,
     selectedInputDeviceId,
     setSelectedInputDeviceId,
-  } = useAudioStore();
+  } = useAudioStore(
+    useShallow((state) => ({
+      connect: state.connect,
+      disconnect: state.disconnect,
+      connectionState: state.connectionState,
+      isMuted: state.isMuted,
+      toggleMute: state.toggleMute,
+      selectedInputDeviceId: state.selectedInputDeviceId,
+      setSelectedInputDeviceId: state.setSelectedInputDeviceId,
+    })),
+  );
 
   const isConnected = connectionState === ConnectionState.CONNECTED;
   const isRequestingPermission =
@@ -49,7 +60,7 @@ function ControlsPanel() {
                 toggleMute();
               }
             }}
-            disabled={isDisconnecting}
+            disabled={hasActiveAttempt}
             className="w-full sm:w-auto"
           />
         </div>
