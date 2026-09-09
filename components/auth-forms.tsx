@@ -81,7 +81,7 @@ function ErrorMessage({ message }: { message: string }) {
 
 export function AuthForm({
   mode,
-  nextPath = "/tutor",
+  nextPath = "/dashboard",
   notice,
 }: {
   mode: AuthMode;
@@ -463,7 +463,7 @@ export function AuthCallback() {
           return;
         }
 
-        router.replace("/tutor");
+        router.replace("/dashboard");
         router.refresh();
       } catch {
         setError("Could not finish signing in. Please try again.");
