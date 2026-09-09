@@ -94,7 +94,13 @@ export class GeminiFeedbackProvider implements FeedbackProvider {
   private readonly model =
     process.env.GEMINI_FEEDBACK_MODEL?.trim() || "gemini-2.5-flash";
 
-  async generate({ prompt }: { prompt: string }): Promise<string> {
+  async generate({
+    systemInstruction,
+    prompt,
+  }: {
+    systemInstruction: string;
+    prompt: string;
+  }): Promise<string> {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
 
@@ -103,6 +109,7 @@ export class GeminiFeedbackProvider implements FeedbackProvider {
       model: this.model,
       contents: prompt,
       config: {
+        systemInstruction,
         responseMimeType: "application/json",
         responseSchema: SESSION_FEEDBACK_RESPONSE_SCHEMA,
         temperature: 0.2,
