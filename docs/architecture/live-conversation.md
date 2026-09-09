@@ -27,7 +27,7 @@ Runtime resources do **not** live in Zustand. The store closure owns the active 
 - playback timeline/queue
 - connection generation
 
-This gives every browser/provider resource one creator and one cleanup path.
+The Tutor route also mounts a small lifecycle component whose only responsibility is to call the store's idempotent disconnect action when the route unmounts. This prevents microphone/provider resources from surviving navigation.
 
 ## Data flow
 
@@ -37,7 +37,7 @@ flowchart LR
     Store --> Live[LiveManager]
     Live --> Mic[getUserMedia]
     Mic --> InputCtx[Input AudioContext]
-    InputCtx --> Worklet[Mic AudioWorklet ~20 ms chunks]
+    InputCtx --> Worklet[Mic AudioWorklet ~40 ms chunks]
     Worklet --> PCM[Float32 to Int16 PCM]
     PCM --> Gemini[Gemini Live session]
 
@@ -68,9 +68,9 @@ DISCONNECTED
 
 Expected failures may enter `ERROR`. A retry starts a new explicit connection attempt.
 
-The store maintains a connection-attempt number for token-request cancellation. `LiveManager` independently maintains a monotonically increasing generation. Async media/provider work and provider callbacks mutate state only when their generation is still current.
+The store maintains a connection-attempt number for token-request cancellation. `LiveManager` independently maintains a monotonically increasing generation. Async media/provider work and provider callbacks may publish state only while their captured generation remains current.
 
-Manual disconnect invalidates the active generation before closing resources. That prevents a late `getUserMedia`, Gemini callback, or decode completion from resurrecting a stale session.
+Manual disconnect invalidates the generation before cleanup. Provider close/error handlers also re-check their cleanup generation after asynchronous cleanup completes, so a stale close cannot overwrite a newer disconnect/reconnect state.
 
 There is no automatic reconnect loop.
 
@@ -82,16 +82,16 @@ selected microphone
   -> input AudioContext
   -> MediaStreamAudioSourceNode
   -> mic-processor AudioWorklet
-  -> ~20 ms Float32 chunks
+  -> ~40 ms Float32 chunks
   -> Int16 little-endian PCM
   -> Gemini sendRealtimeInput
 ```
 
-The requested input context rate is 16 kHz, but browsers/devices may use a different actual rate. PCM metadata therefore uses `inputAudioContext.sampleRate` rather than blindly declaring 16 kHz. Gemini can resample raw PCM when the declared MIME rate is accurate.
+The requested input context rate is 16 kHz, but browsers/devices may use a different actual rate. PCM metadata uses `inputAudioContext.sampleRate` rather than blindly declaring 16 kHz.
 
-Mute disables the microphone track and also prevents worklet chunks from being sent. The selected device ID is passed to `getUserMedia` on the next connection.
+Mute disables the microphone track and prevents worklet chunks from being sent. The selected device ID is passed to `getUserMedia` on the next connection. Device selection is disabled while a connection attempt/session is active because changing the selector does not replace the existing `MediaStream`.
 
-The worklet batches render quanta into approximately 20 ms chunks instead of posting every 128-frame quantum. This reduces main-thread/provider send frequency without introducing a large buffering subsystem.
+The worklet batches render quanta into approximately 40 ms chunks instead of posting every 128-frame quantum. Output level analysis still samples on `requestAnimationFrame`, but publishes UI state at roughly 20 Hz rather than every frame.
 
 ## Gemini boundary
 
@@ -103,13 +103,16 @@ lib/live/gemini-events.ts
 
 It converts `LiveServerMessage` into only the signals the application needs:
 
-- interim input transcript
-- final input transcript
-- output transcript fragment
+- user voice-activity start/end
+- interim input transcription
+- input transcription chunks plus SDK `finished` state
+- output transcription chunks plus SDK `finished` state
 - interruption
 - turn completion
 - audio chunks
 - waiting/in-progress flags
+
+The installed `@google/genai@2.19.0` SDK exposes `Transcription.finished?: boolean`. The application preserves that signal instead of inferring finality from assistant output ordering.
 
 All audio parts in a model turn are inspected. The implementation does not assume audio is always `parts[0]`.
 
@@ -119,9 +122,9 @@ The configured model is:
 gemini-2.5-flash-native-audio-preview-12-2025
 ```
 
-It remains a supported Gemini Live native-audio model. The previous `09-2025` preview identifier is no longer in the current Live model catalog.
+The previous `09-2025` preview identifier is not used by this branch.
 
-Native-audio models choose spoken language automatically. The selected language remains part of the tutor system instruction rather than setting an unsupported native-audio speech language code.
+Native-audio models choose spoken language automatically. The selected language remains part of the tutor system instruction.
 
 ## Transcript model
 
@@ -139,20 +142,19 @@ The state keeps explicit input/output streaming buffers and immutable completed 
 
 ### Input semantics
 
-`interimInputTranscription` is treated as a replaceable low-latency snapshot.
+`interimInputTranscription` is a replaceable low-latency snapshot and updates the current user row in place.
 
-`inputTranscription` is merged defensively. The merge accepts both:
+`inputTranscription.text` is treated as transcription chunks and appended in provider order. Legitimate repeated speech such as `"very "` + `"very "` remains `"very very "`; arbitrary overlap heuristics are deliberately avoided.
 
-- delta fragments such as `"I "`, `"want "`, `"coffee"`
-- cumulative/repeated snapshots such as `"I"`, `"I want"`, `"I want coffee"`
-
-Overlapping/repeated text is deduplicated.
+When `inputTranscription.finished === true`, the user row is finalized immediately. If final input transcription arrives after assistant output has begun and no user row existed yet, the reducer inserts that user row before the still-streaming assistant row to preserve conversational order.
 
 ### Output semantics
 
-Output transcription uses the same overlap/cumulative-safe merge. A single assistant row is updated while streaming and finalized at interruption or turn completion.
+`outputTranscription.text` chunks append in provider order. `outputTranscription.finished === true` finalizes the assistant row immediately.
 
-Because Gemini documents input/output transcription as independent from model-turn ordering, the first observed assistant output provides a practical boundary for finalizing the current user turn. `turnComplete` is a fallback boundary for any remaining user text and the normal assistant-finalization boundary.
+Assistant output does **not** finalize a pending user row, because Gemini input and output transcription delivery can be independent.
+
+`turnComplete` remains a fallback boundary for provider cases where `finished` has not finalized the streaming text. It will not finalize user input while user voice activity is currently active, which prevents the previous model turn's completion from closing a new barge-in utterance.
 
 ### Interruption
 
@@ -161,12 +163,23 @@ When an interrupted update arrives:
 1. any transcript fragment carried by that server update is applied;
 2. the assistant streaming transcript is finalized once;
 3. playback is reset immediately;
-4. audio bytes carried by the interrupted server update are discarded;
+4. audio bytes carried by that interrupted server update are discarded;
 5. future model audio is allowed on a fresh playback epoch.
 
-This preserves valid observed text without replaying obsolete speech.
+This preserves observed text without replaying obsolete speech.
 
-Whitespace-only events never create rows. A new connection creates a new transcript-session identity, so streaming buffers cannot leak across reconnects.
+### Session end
+
+On manual disconnect, unexpected provider close/error, or Tutor route unmount, the store first emits a `session-end` transcript event before finalizing persistence.
+
+The explicit policy is:
+
+- discard speculative interim-only user text that was never confirmed by input transcription;
+- preserve committed user transcription;
+- preserve observed assistant output transcription;
+- clear streaming buffers before the next session.
+
+A new connection creates a new transcript-session identity, so streaming state cannot leak across reconnects.
 
 Only reducer-returned **newly completed** rows are persisted to `LearningSessionRecorder`.
 
@@ -189,15 +202,16 @@ Cleanup:
 - invalidates the current connection generation
 - optionally closes the Gemini session
 - cancels output-level animation
-- increments/reset playback epoch and stops queued/active output
+- resets playback epoch and stops queued/active output
 - clears the worklet message callback and closes its port
 - disconnects source/worklet/output nodes
 - stops all microphone tracks
 - closes audio contexts
 - resets runtime references and playback timeline
 - resets mute/audio-level/agent state
+- applies the transcript session-end policy before recorder finalization
 
-Independent cleanup operations are best-effort so one node that is already closed does not prevent later resources from being released.
+Independent cleanup operations are best-effort so one already-closed resource does not prevent later resources from being released.
 
 ## Error handling
 
@@ -217,27 +231,30 @@ The existing authenticated `/api/token` endpoint remains the credential boundary
 
 ## Rendering and scrolling
 
-The transcript UI subscribes only to transcript messages, so audio-level updates do not force it to rebuild the transcript array.
+The transcript UI subscribes only to transcript messages. Controls, status, practice setup, and visualization use focused Zustand selectors, so high-frequency audio-level updates do not force unrelated Tutor components to rerender.
 
 `use-stick-to-bottom` follows new content while the user is at the bottom and exposes a "scroll to latest" control after the user scrolls upward.
 
-Desktop retains the right transcript sidebar. Mobile now exposes a bounded transcript panel instead of hiding transcript functionality below the `lg` breakpoint.
+Desktop uses the right transcript sidebar. Mobile uses the existing transcript sheet opened from the navbar; the refactor does not create a second overlapping transcript surface.
 
 ## Tests
 
 Deterministic tests cover:
 
-- interim input snapshots
-- final/delta input fragments
-- cumulative/duplicate transcript events
-- assistant streaming and finalization
+- interim input snapshot replacement
+- input/output transcription delta accumulation
+- SDK `finished` finalization
+- late final input arriving after assistant output
+- repeated-word preservation
 - speaker ordering
-- interruption
-- whitespace
+- barge-in and interruption boundaries
+- `turnComplete` fallback behavior
+- whitespace handling
+- disconnect/session-end policy
 - reconnect isolation
 - stable message IDs
 - Gemini message normalization
 - all model-turn audio parts
 - PCM bounds, clamping, byte length, and actual sample-rate metadata
 
-Browser-owned resources are verified at the integration/E2E layer rather than by building a single test that mocks `window`, `navigator`, AudioContext, Gemini, Zustand, and React simultaneously.
+Browser-owned resources are verified at the integration/E2E layer rather than by building one large test that mocks `window`, `navigator`, AudioContext, Gemini, Zustand, and React simultaneously.
