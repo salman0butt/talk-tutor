@@ -4,6 +4,7 @@ import { AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAudioStore } from "@/store/useAudioStore";
 import { ConnectionState } from "@/types";
+import { useShallow } from "zustand/react/shallow";
 
 const STATUS_COPY: Record<ConnectionState, string> = {
   [ConnectionState.DISCONNECTED]: "Ready to Talk",
@@ -15,7 +16,12 @@ const STATUS_COPY: Record<ConnectionState, string> = {
 };
 
 function StatusPanel() {
-  const { connectionState, error } = useAudioStore();
+  const { connectionState, error } = useAudioStore(
+    useShallow((state) => ({
+      connectionState: state.connectionState,
+      error: state.error,
+    })),
+  );
 
   const isConnected = connectionState === ConnectionState.CONNECTED;
   const isBusy =
