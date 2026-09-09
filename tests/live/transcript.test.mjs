@@ -445,3 +445,82 @@ test('session end discards speculative interim input but commits observed assist
   assert.equal(ended.completed.length, 1);
   assert.equal(ended.completed[0].speaker, 'assistant');
 });
+
+
+test('late finalized input keeps its activity-time order even after assistant already completed', () => {
+  let state = createTranscriptState('late-after-assistant-complete');
+  state = applyTranscriptEvent(state, {
+    type: 'input-activity-start',
+    at: 1000,
+  }).state;
+  state = applyTranscriptEvent(state, {
+    type: 'input-activity-end',
+    at: 1010,
+  }).state;
+  state = applyTranscriptEvent(state, {
+    type: 'output-transcription',
+    text: 'Assistant answer',
+    finished: true,
+    at: 1020,
+  }).state;
+
+  const finalInput = applyTranscriptEvent(state, {
+    type: 'input-transcription',
+    text: 'User question',
+    finished: true,
+    at: 1030,
+  });
+
+  assert.deepEqual(
+    finalInput.state.messages.map(({ speaker, text, status }) => ({
+      speaker,
+      text,
+      status,
+    })),
+    [
+      { speaker: 'user', text: 'User question', status: 'complete' },
+      { speaker: 'assistant', text: 'Assistant answer', status: 'complete' },
+    ],
+  );
+});
+
+test('barge-in user activity remains after the interrupted assistant in transcript order', () => {
+  let state = createTranscriptState('barge-in-position');
+  state = applyTranscriptEvent(state, {
+    type: 'output-transcription',
+    text: 'Assistant was speaking',
+    finished: false,
+    at: 1000,
+  }).state;
+  state = applyTranscriptEvent(state, {
+    type: 'input-activity-start',
+    at: 1010,
+  }).state;
+  state = applyTranscriptEvent(state, {
+    type: 'interrupted',
+    at: 1020,
+  }).state;
+
+  const user = applyTranscriptEvent(state, {
+    type: 'input-transcription',
+    text: 'Let me interrupt',
+    finished: true,
+    at: 1030,
+  });
+
+  assert.deepEqual(
+    user.state.messages.map(({ speaker, text, status }) => ({
+      speaker,
+      text,
+      status,
+    })),
+    [
+      {
+        speaker: 'assistant',
+        text: 'Assistant was speaking',
+        status: 'complete',
+      },
+      { speaker: 'user', text: 'Let me interrupt', status: 'complete' },
+    ],
+  );
+});
