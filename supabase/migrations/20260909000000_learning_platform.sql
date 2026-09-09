@@ -19,6 +19,32 @@ create table public.profiles (
   updated_at timestamptz not null default now()
 );
 
+create or replace function public.validate_profile_timezone()
+returns trigger
+language plpgsql
+security invoker
+set search_path = ''
+as $
+begin
+  if not exists (
+    select 1
+    from pg_catalog.pg_timezone_names
+    where name = new.timezone
+  ) then
+    raise exception 'invalid IANA timezone'
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$;
+
+create trigger profiles_validate_timezone
+before insert or update of timezone
+on public.profiles
+for each row
+execute function public.validate_profile_timezone();
+
 create table public.learning_sessions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -177,6 +203,8 @@ begin
   end if;
 
   if jsonb_typeof(p_messages) <> 'array'
+     or jsonb_array_length(p_messages) < 1
+     or jsonb_array_length(p_messages) > 20
      or not exists (
        select 1
        from jsonb_array_elements(p_messages) as item
@@ -360,7 +388,7 @@ weekly_rows as (
   order by local_date
 ),
 vocabulary_terms as (
-  select distinct lower(regexp_replace(btrim(item->>'term'), '\s+', ' ', 'g')) as term
+  select distinct lower(regexp_replace(btrim(normalize(item->>'term', NFKC)), '\s+', ' ', 'g')) as term
   from public.session_feedback f
   cross join lateral jsonb_array_elements(f.vocabulary) item
   where f.user_id = auth.uid()
@@ -412,6 +440,7 @@ select jsonb_build_object(
 );
 $$;
 
+revoke all on function public.validate_profile_timezone() from public, anon;
 revoke all on function public.start_learning_session(text,text,text,text,jsonb) from public, anon;
 revoke all on function public.append_learning_message(uuid,text,integer,text,timestamptz) from public, anon;
 revoke all on function public.finalize_learning_session(uuid) from public, anon;
