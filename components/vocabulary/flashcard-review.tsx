@@ -18,7 +18,13 @@ const ratings: Array<{
   { rating: "easy", label: "Easy", key: "4", hint: "Immediate recall" },
 ];
 
-export function FlashcardReview({\n  initialItems,\n  nextDueAt,\n}: {\n  initialItems: SavedVocabularyItem[];\n  nextDueAt: string | null;\n}) {
+export function FlashcardReview({
+  initialItems,
+  nextDueAt,
+}: {
+  initialItems: SavedVocabularyItem[];
+  nextDueAt: string | null;
+}) {
   const [items, setItems] = useState(initialItems);
   const [revealed, setRevealed] = useState(false);
   const [busy, setBusy] = useState(false);
