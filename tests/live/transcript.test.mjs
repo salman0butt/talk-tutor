@@ -170,3 +170,93 @@ test('cumulative and duplicate assistant transcript events merge without repetit
   assert.equal(transition.completed.length, 1);
   assert.equal(transition.completed[0].text, 'Hello there');
 });
+
+
+test('finished input transcription commits the user turn without waiting for assistant output', () => {
+  let state = createTranscriptState('finished-input');
+  state = applyTranscriptEvent(
+    state,
+    { type: 'input-transcription', text: 'Hello there', finished: true, at: 1000 },
+  ).state;
+
+  assert.deepEqual(
+    state.messages.map(({ speaker, text, status }) => ({ speaker, text, status })),
+    [{ speaker: 'user', text: 'Hello there', status: 'complete' }],
+  );
+});
+
+test('assistant output does not prematurely finalize a user turn whose final transcription is still pending', () => {
+  let state = createTranscriptState('late-input-final');
+  state = applyTranscriptEvent(
+    state,
+    { type: 'input-interim', text: 'I want coffee', at: 1000 },
+  ).state;
+
+  const assistantStarted = applyTranscriptEvent(
+    state,
+    { type: 'output-transcription', text: 'Sure.', finished: false, at: 1010 },
+  );
+
+  assert.equal(assistantStarted.completed.length, 0);
+  assert.deepEqual(
+    assistantStarted.state.messages.map(({ speaker, text, status }) => ({ speaker, text, status })),
+    [
+      { speaker: 'user', text: 'I want coffee', status: 'streaming' },
+      { speaker: 'assistant', text: 'Sure.', status: 'streaming' },
+    ],
+  );
+
+  const finalInput = applyTranscriptEvent(
+    assistantStarted.state,
+    { type: 'input-transcription', text: 'I want coffee', finished: true, at: 1020 },
+  );
+
+  assert.equal(finalInput.completed.length, 1);
+  assert.equal(finalInput.completed[0].speaker, 'user');
+  assert.deepEqual(
+    finalInput.state.messages.map(({ speaker, text, status }) => ({ speaker, text, status })),
+    [
+      { speaker: 'user', text: 'I want coffee', status: 'complete' },
+      { speaker: 'assistant', text: 'Sure.', status: 'streaming' },
+    ],
+  );
+});
+
+test('repeated identical transcript deltas preserve legitimate repeated speech', () => {
+  let state = createTranscriptState('repeated-words');
+  state = applyTranscriptEvent(
+    state,
+    { type: 'output-transcription', text: 'very ', finished: false, at: 1000 },
+  ).state;
+  state = applyTranscriptEvent(
+    state,
+    { type: 'output-transcription', text: 'very ', finished: false, at: 1010 },
+  ).state;
+  state = applyTranscriptEvent(
+    state,
+    { type: 'output-transcription', text: 'good', finished: true, at: 1020 },
+  ).state;
+
+  assert.equal(state.messages[0].text, 'very very good');
+  assert.equal(state.messages[0].status, 'complete');
+});
+
+test('turnComplete from an interrupted model does not finalize a newly active user utterance', () => {
+  let state = createTranscriptState('barge-in-order');
+  state = applyTranscriptEvent(
+    state,
+    { type: 'input-activity-start', at: 1000 },
+  ).state;
+  state = applyTranscriptEvent(
+    state,
+    { type: 'input-interim', text: 'Actually let me try', at: 1010 },
+  ).state;
+
+  const boundary = applyTranscriptEvent(
+    state,
+    { type: 'turn-complete', at: 1020 },
+  );
+
+  assert.equal(boundary.completed.length, 0);
+  assert.equal(boundary.state.messages[0].status, 'streaming');
+});
