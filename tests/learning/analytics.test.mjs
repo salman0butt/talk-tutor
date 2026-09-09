@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   localDateKey,
   calculatePracticeStreak,
+  calculateDateKeyStreak,
   normalizeVocabularyTerm,
   uniqueVocabularyTerms,
   aggregateCommonMistakes,
@@ -128,4 +129,11 @@ test('common mistakes aggregate stable feedback categories', () => {
 test('fluency trend compares recent and previous windows without inventing a score', () => {
   assert.deepEqual(summarizeFluencyTrend([]), { current: null, previous: null, delta: null });
   assert.deepEqual(summarizeFluencyTrend([60, 64, 70, 74]), { current: 72, previous: 62, delta: 10 });
+});
+
+test('date-key streak uses already-local practice dates without reinterpreting UTC', () => {
+  assert.equal(calculateDateKeyStreak(['2026-09-07', '2026-09-08', '2026-09-09'], '2026-09-09'), 3);
+  assert.equal(calculateDateKeyStreak(['2026-09-07', '2026-09-08'], '2026-09-09'), 2);
+  assert.equal(calculateDateKeyStreak(['2026-09-07'], '2026-09-09'), 0);
+  assert.equal(calculateDateKeyStreak(['2025-12-31', '2026-01-01'], '2026-01-01'), 2);
 });
