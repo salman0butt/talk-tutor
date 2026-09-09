@@ -6,7 +6,7 @@ on:
       - feat/saas-learning-platform
   pull_request:
     branches:
-      - feat/saas-home-auth
+      - main
 
 permissions:
   contents: read
