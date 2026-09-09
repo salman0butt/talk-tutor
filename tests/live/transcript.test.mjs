@@ -524,3 +524,40 @@ test('barge-in user activity remains after the interrupted assistant in transcri
     ],
   );
 });
+
+
+test('completed messages are released for persistence only in chronological order', () => {
+  let state = createTranscriptState('persistence-order');
+  state = applyTranscriptEvent(state, {
+    type: 'input-activity-start',
+    at: 1000,
+  }).state;
+  state = applyTranscriptEvent(state, {
+    type: 'input-activity-end',
+    at: 1010,
+  }).state;
+
+  const assistantFinished = applyTranscriptEvent(state, {
+    type: 'output-transcription',
+    text: 'Assistant answer',
+    finished: true,
+    at: 1020,
+  });
+
+  assert.equal(assistantFinished.completed.length, 0);
+
+  const userFinished = applyTranscriptEvent(assistantFinished.state, {
+    type: 'input-transcription',
+    text: 'User question',
+    finished: true,
+    at: 1030,
+  });
+
+  assert.deepEqual(
+    userFinished.completed.map(({ speaker, text }) => ({ speaker, text })),
+    [
+      { speaker: 'user', text: 'User question' },
+      { speaker: 'assistant', text: 'Assistant answer' },
+    ],
+  );
+});
