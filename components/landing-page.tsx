@@ -92,8 +92,8 @@ function Brand() {
 }
 
 export function LandingPage({ isAuthenticated }: { isAuthenticated: boolean }) {
-  const primaryHref = isAuthenticated ? "/tutor" : "/signup";
-  const primaryLabel = isAuthenticated ? "Open your tutor" : "Start speaking free";
+  const primaryHref = isAuthenticated ? "/dashboard" : "/signup";
+  const primaryLabel = isAuthenticated ? "Open dashboard" : "Start speaking free";
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#08090d] text-white selection:bg-amber-300 selection:text-black">
@@ -504,8 +504,8 @@ export function LandingPage({ isAuthenticated }: { isAuthenticated: boolean }) {
           </p>
           <div className="flex gap-5 text-xs text-white/35">
             {isAuthenticated ? (
-              <Link href="/tutor" className="transition hover:text-white">
-                Open tutor
+              <Link href="/dashboard" className="transition hover:text-white">
+                Dashboard
               </Link>
             ) : (
               <>
