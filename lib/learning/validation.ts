@@ -1,3 +1,4 @@
+import { parsePracticeConfiguration } from "./practice.ts";
 import {
   GRAMMAR_CATEGORIES,
   LEARNING_GOALS,
@@ -14,6 +15,8 @@ const LEVELS = new Set(["Basic","Intermediate","Top Class"]);
 const VOICES = new Set(["Charon","Puck","Kore","Fenrir","Aoede"]);
 const GOALS = new Set(LEARNING_GOALS);
 const CATEGORIES = new Set(GRAMMAR_CATEGORIES);
+const CORRECTION_FREQUENCIES = new Set(["minimal", "balanced", "frequent"]);
+const CONVERSATION_DIFFICULTIES = new Set(["easy", "normal", "challenging"]);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function asRecord(value: unknown, label = "value"): Record<string, unknown> {
@@ -83,6 +86,16 @@ export function parseProfilePatch(input: unknown): LearningProfilePatch {
     if (!isIanaTimezone(value)) throw new Error("Timezone must be a valid IANA timezone.");
     result.timezone = value;
   }
+  if ("correctionFrequency" in data) {
+    const value = requiredString(data.correctionFrequency, "Correction frequency", 24);
+    if (!CORRECTION_FREQUENCIES.has(value)) throw new Error("Unsupported correction frequency.");
+    result.correctionFrequency = value as LearningProfilePatch["correctionFrequency"];
+  }
+  if ("conversationDifficulty" in data) {
+    const value = requiredString(data.conversationDifficulty, "Conversation difficulty", 24);
+    if (!CONVERSATION_DIFFICULTIES.has(value)) throw new Error("Unsupported conversation difficulty.");
+    result.conversationDifficulty = value as LearningProfilePatch["conversationDifficulty"];
+  }
   if (Object.keys(result).length === 0) throw new Error("Provide at least one profile field to update.");
   return result;
 }
@@ -143,30 +156,31 @@ export function parseSessionFeedback(input: unknown): SessionFeedback {
   };
 }
 
-const TOPICS = new Set([
-  "Free Chat",
-  "Business Meeting",
-  "Travel & Directions",
-  "Job Interview",
-  "Ordering Food",
-  "Daily Routine",
-  "Movies & Hobbies",
-]);
-
 export function parseStartSessionInput(input: unknown) {
   const data = asRecord(input, "Session start");
   const language = requiredString(data.language, "Language", 16);
   if (!LANGUAGES.has(language)) throw new Error("Unsupported session language.");
   const proficiencyLevel = requiredString(data.proficiencyLevel, "Proficiency level", 32);
   if (!LEVELS.has(proficiencyLevel)) throw new Error("Unsupported proficiency level.");
-  const topic = requiredString(data.topic, "Topic", 120);
-  if (!TOPICS.has(topic)) throw new Error("Unsupported conversation topic.");
   const assistantVoice = requiredString(data.assistantVoice, "Assistant voice", 32);
   if (!VOICES.has(assistantVoice)) throw new Error("Unsupported assistant voice.");
+
+  const practice = parsePracticeConfiguration({
+    practiceMode: data.practiceMode,
+    topic: data.topic,
+    scenarioId: data.scenarioId,
+    customScenario: data.customScenario,
+    learnerRole: data.learnerRole,
+    tutorRole: data.tutorRole,
+    correctionFrequency: data.correctionFrequency,
+    difficulty: data.difficulty,
+    targetMistakeCategories: data.targetMistakeCategories,
+  });
+
   const rawMessages = ensureArray(data.messages, "messages", 20);
   const messages = rawMessages.map(parseFinalTranscriptMessage);
   if (!messages.some((message) => message.role === "user")) {
     throw new Error("A finalized user message is required to start a session.");
   }
-  return { language, proficiencyLevel, topic, assistantVoice, messages };
+  return { language, proficiencyLevel, assistantVoice, ...practice, messages };
 }
