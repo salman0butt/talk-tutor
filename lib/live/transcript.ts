@@ -50,6 +50,28 @@ function hasMeaningfulText(text: string) {
   return text.trim().length > 0;
 }
 
+function mergeTranscriptText(existing: string, incoming: string) {
+  if (!incoming) return existing;
+  if (!existing) return incoming;
+
+  if (incoming.startsWith(existing)) {
+    return incoming;
+  }
+
+  if (existing.endsWith(incoming)) {
+    return existing;
+  }
+
+  const maxOverlap = Math.min(existing.length, incoming.length);
+  for (let overlap = maxOverlap - 1; overlap > 0; overlap--) {
+    if (existing.endsWith(incoming.slice(0, overlap))) {
+      return existing + incoming.slice(overlap);
+    }
+  }
+
+  return existing + incoming;
+}
+
 function messageIdField(speaker: TranscriptSpeaker) {
   return speaker === "user" ? "inputMessageId" : "outputMessageId";
 }
@@ -179,7 +201,10 @@ export function applyTranscriptEvent(
       }
 
       const inputInterimText = event.text;
-      const visibleText = state.inputFinalText + inputInterimText;
+      const visibleText = mergeTranscriptText(
+        state.inputFinalText,
+        inputInterimText,
+      );
       const nextState = upsertStreamingMessage(
         { ...state, inputInterimText },
         "user",
@@ -198,7 +223,10 @@ export function applyTranscriptEvent(
         return { state, completed: [] };
       }
 
-      const inputFinalText = state.inputFinalText + event.text;
+      const inputFinalText = mergeTranscriptText(
+        state.inputFinalText,
+        event.text,
+      );
       const nextState = upsertStreamingMessage(
         {
           ...state,
@@ -218,7 +246,10 @@ export function applyTranscriptEvent(
       }
 
       const userTransition = finalizeInput(state, event.at);
-      const outputText = userTransition.state.outputText + event.text;
+      const outputText = mergeTranscriptText(
+        userTransition.state.outputText,
+        event.text,
+      );
       const nextState = upsertStreamingMessage(
         { ...userTransition.state, outputText },
         "assistant",
