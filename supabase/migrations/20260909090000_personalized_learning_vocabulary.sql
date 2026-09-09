@@ -69,7 +69,7 @@ create table public.vocabulary_items (
   constraint vocabulary_items_owner_key unique (id, user_id),
   constraint vocabulary_items_user_language_term_key
     unique (user_id, language, normalized_term),
-  constraint vocabulary_items_normalized_term_check
+  constraint vocabulary_items_normalization_matches_term
     check (
       normalized_term =
       lower(regexp_replace(btrim(normalize(term, NFKC)), '\s+', ' ', 'g'))
