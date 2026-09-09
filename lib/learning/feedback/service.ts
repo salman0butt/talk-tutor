@@ -36,6 +36,84 @@ export interface FeedbackProvider {
   }): Promise<string>;
 }
 
+export type FeedbackFailureCode =
+  | "provider_timeout"
+  | "provider_rate_limited"
+  | "provider_failed"
+  | "invalid_json"
+  | "invalid_output"
+  | "persistence_failed";
+
+export class FeedbackGenerationError extends Error {
+  readonly code: FeedbackFailureCode;
+
+  constructor(
+    code: FeedbackFailureCode,
+    message: string,
+    options?: { cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "FeedbackGenerationError";
+    this.code = code;
+  }
+}
+
+function providerFailureCode(error: unknown): FeedbackFailureCode {
+  const candidate =
+    error && typeof error === "object"
+      ? (error as { status?: unknown; code?: unknown; message?: unknown })
+      : null;
+  const status =
+    typeof candidate?.status === "number"
+      ? candidate.status
+      : typeof candidate?.code === "number"
+        ? candidate.code
+        : null;
+  const message =
+    typeof candidate?.message === "string"
+      ? candidate.message.toLocaleLowerCase()
+      : "";
+
+  if (
+    status === 408 ||
+    status === 504 ||
+    message.includes("timeout") ||
+    message.includes("timed out") ||
+    message.includes("deadline exceeded")
+  ) {
+    return "provider_timeout";
+  }
+  if (
+    status === 429 ||
+    message.includes("rate limit") ||
+    message.includes("resource exhausted") ||
+    message.includes("quota")
+  ) {
+    return "provider_rate_limited";
+  }
+  return "provider_failed";
+}
+
+export function parseFeedbackProviderJson(raw: string): unknown {
+  let text = raw.trim();
+
+  // Structured-output responses should be raw JSON, but tolerate the known
+  // provider failure mode where JSON is wrapped in a Markdown code fence.
+  if (text.startsWith("```")) {
+    text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  }
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch (error) {
+    throw new FeedbackGenerationError(
+      "invalid_json",
+      "Feedback provider returned malformed JSON.",
+      { cause: error },
+    );
+  }
+}
+
 export const FEEDBACK_SYSTEM_INSTRUCTION = [
   "You are Talk Tutor's post-session language coach.",
   "Analyze only the learner's language demonstrated in the provided session data.",
@@ -142,16 +220,51 @@ export class FeedbackService {
         topic: session.topic ?? "conversation",
         transcript,
       });
-      const raw = await this.provider.generate({
-        systemInstruction: FEEDBACK_SYSTEM_INSTRUCTION,
-        prompt,
-      });
+      let raw: string;
+      try {
+        raw = await this.provider.generate({
+          systemInstruction: FEEDBACK_SYSTEM_INSTRUCTION,
+          prompt,
+        });
+      } catch (error) {
+        throw new FeedbackGenerationError(
+          providerFailureCode(error),
+          error instanceof Error
+            ? error.message
+            : "Feedback provider request failed.",
+          { cause: error },
+        );
+      }
+
+      let parsedFeedback: SessionFeedback;
+      try {
+        parsedFeedback = parseSessionFeedback(parseFeedbackProviderJson(raw));
+      } catch (error) {
+        if (error instanceof FeedbackGenerationError) throw error;
+        throw new FeedbackGenerationError(
+          "invalid_output",
+          error instanceof Error
+            ? error.message
+            : "Feedback provider returned an invalid response.",
+          { cause: error },
+        );
+      }
+
       const { feedback } = applyFeedbackGuardrails(
-        parseSessionFeedback(JSON.parse(raw) as unknown),
+        parsedFeedback,
         transcript,
       );
-      await this.repository.saveFeedback(sessionId, feedback);
-      await this.repository.setFeedbackStatus(sessionId, "completed");
+
+      try {
+        await this.repository.saveFeedback(sessionId, feedback);
+        await this.repository.setFeedbackStatus(sessionId, "completed");
+      } catch (error) {
+        throw new FeedbackGenerationError(
+          "persistence_failed",
+          "Generated feedback could not be persisted.",
+          { cause: error },
+        );
+      }
       return { status: "completed", feedback };
     } catch (error) {
       await this.repository

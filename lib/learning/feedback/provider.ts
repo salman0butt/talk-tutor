@@ -2,8 +2,9 @@ import "server-only";
 import { GoogleGenAI, Type } from "@google/genai";
 import type { FeedbackProvider } from "@/lib/learning/feedback/service";
 
-const FEEDBACK_REQUEST_TIMEOUT_MS = 30_000;
-const FEEDBACK_MAX_OUTPUT_TOKENS = 4_096;
+const FEEDBACK_REQUEST_TIMEOUT_MS = 60_000;
+const FEEDBACK_MAX_OUTPUT_TOKENS = 8_192;
+const FEEDBACK_THINKING_BUDGET = 2_048;
 
 export const SESSION_FEEDBACK_RESPONSE_SCHEMA = {
   type: Type.OBJECT,
@@ -124,6 +125,14 @@ export class GeminiFeedbackProvider implements FeedbackProvider {
         responseSchema: SESSION_FEEDBACK_RESPONSE_SCHEMA,
         temperature: 0.2,
         maxOutputTokens: FEEDBACK_MAX_OUTPUT_TOKENS,
+        ...(this.model.startsWith("gemini-2.5-")
+          ? {
+              // Gemini 2.5 Flash defaults to dynamic thinking. Keep reasoning
+              // available for language analysis, but bound it so a simple
+              // feedback request cannot consume the entire response budget.
+              thinkingConfig: { thinkingBudget: FEEDBACK_THINKING_BUDGET },
+            }
+          : {}),
         httpOptions: { timeout: FEEDBACK_REQUEST_TIMEOUT_MS },
       },
     });
