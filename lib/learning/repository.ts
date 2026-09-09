@@ -151,7 +151,11 @@ export class LearningRepository {
       },
     );
     const rows = await readSupabaseJson<ProfileRow[]>(response);
-    return rows[0] ? mapProfile(rows[0]) : (await this.getProfile())!;
+    if (rows[0]) return mapProfile(rows[0]);
+
+    const profile = await this.getProfile();
+    if (!profile) throw new Error("Profile creation failed.");
+    return profile;
   }
 
   async patchProfile(patch: LearningProfilePatch): Promise<LearningProfile> {
@@ -305,6 +309,24 @@ export class LearningRepository {
       },
     );
     if (!response.ok) await readSupabaseJson(response);
+  }
+
+  async claimFeedbackGeneration(sessionId: string): Promise<boolean> {
+    ownedSessionFilter(this.userId, sessionId);
+    const response = await supabaseRestFetch(
+      `learning_sessions?id=eq.${sessionId}&user_id=eq.${this.userId}&status=eq.completed&feedback_status=in.(pending,failed)`,
+      this.accessToken,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          feedback_status: "processing",
+          updated_at: new Date().toISOString(),
+        }),
+        prefer: "return=representation",
+      },
+    );
+    const rows = await readSupabaseJson<Array<{ id: string }>>(response);
+    return rows.length === 1;
   }
 
   async setFeedbackStatus(sessionId: string, status: LearningSessionSummary["feedbackStatus"]): Promise<void> {
