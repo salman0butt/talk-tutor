@@ -24,7 +24,7 @@ returns trigger
 language plpgsql
 security invoker
 set search_path = ''
-as $
+as $$
 begin
   if not exists (
     select 1
@@ -37,7 +37,7 @@ begin
 
   return new;
 end;
-$;
+$$;
 
 create trigger profiles_validate_timezone
 before insert or update of timezone
