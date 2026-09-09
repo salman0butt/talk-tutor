@@ -15,6 +15,7 @@ import type {
 } from "@/lib/learning/vocabulary";
 import { ownedSessionFilter, withAuthenticatedOwner } from "@/lib/learning/ownership";
 import { isUuid } from "@/lib/learning/validation";
+import type { OnboardingSubmission } from "@/lib/onboarding/submission";
 import { readSupabaseJson, supabaseRestFetch } from "@/lib/supabase/rest";
 
 type ProfileRow = {
@@ -27,6 +28,10 @@ type ProfileRow = {
   timezone: string;
   correction_frequency: LearningProfile["correctionFrequency"];
   conversation_difficulty: LearningProfile["conversationDifficulty"];
+  onboarding_completed_at: string | null;
+  placement_completed_at: string | null;
+  placement_score: number | null;
+  recommended_level: LearningProfile["recommendedLevel"];
   created_at: string;
   updated_at: string;
 };
@@ -118,6 +123,10 @@ function mapProfile(row: ProfileRow): LearningProfile {
     timezone: row.timezone,
     correctionFrequency: row.correction_frequency,
     conversationDifficulty: row.conversation_difficulty,
+    onboardingCompletedAt: row.onboarding_completed_at,
+    placementCompletedAt: row.placement_completed_at,
+    placementScore: row.placement_score,
+    recommendedLevel: row.recommended_level,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -298,6 +307,34 @@ export class LearningRepository {
     );
     const rows = await readSupabaseJson<ProfileRow[]>(response);
     if (!rows[0]) throw new Error("Profile update failed.");
+    return mapProfile(rows[0]);
+  }
+
+  async completeOnboarding(
+    input: OnboardingSubmission,
+  ): Promise<LearningProfile> {
+    await this.ensureProfile();
+    const completedAt = new Date().toISOString();
+    const response = await supabaseRestFetch(
+      `profiles?id=eq.${this.userId}`,
+      this.accessToken,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          learning_goal: input.goal,
+          proficiency_level: input.selectedLevel,
+          conversation_difficulty: input.recommendation.difficulty,
+          placement_completed_at: completedAt,
+          placement_score: input.score,
+          recommended_level: input.recommendedLevel,
+          onboarding_completed_at: completedAt,
+          updated_at: completedAt,
+        }),
+        prefer: "return=representation",
+      },
+    );
+    const rows = await readSupabaseJson<ProfileRow[]>(response);
+    if (!rows[0]) throw new Error("Onboarding could not be completed.");
     return mapProfile(rows[0]);
   }
 

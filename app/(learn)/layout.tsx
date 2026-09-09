@@ -1,10 +1,20 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { getCurrentUser } from "@/lib/auth";
+import { getOrCreateLearningProfile } from "@/lib/learning/server";
 
-export default async function LearningLayout({ children }: { children: React.ReactNode }) {
+export default async function LearningLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/dashboard");
+
+  const profile = await getOrCreateLearningProfile();
+  if (!profile.onboardingCompletedAt) {
+    redirect("/onboarding");
+  }
 
   const displayName =
     user.user_metadata?.full_name ??

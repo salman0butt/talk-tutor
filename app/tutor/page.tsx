@@ -30,6 +30,7 @@ export default async function TutorPage({
     mode?: string;
     scenario?: string;
     target?: string;
+    topic?: string;
   }>;
 }) {
   const user = await getCurrentUser();
@@ -41,12 +42,20 @@ export default async function TutorPage({
   const [{ profile, targetMistakeCategories }, query] =
     await Promise.all([getTutorPracticeContext(), searchParams]);
 
+  if (!profile.onboardingCompletedAt) {
+    redirect("/onboarding");
+  }
+
   const practiceMode = PRACTICE_MODES.has(query.mode ?? "")
     ? (query.mode as PracticeMode)
     : undefined;
   const queryTarget =
     query.target && CATEGORY_SET.has(query.target)
       ? [query.target as GrammarCategory]
+      : undefined;
+  const topic =
+    typeof query.topic === "string"
+      ? query.topic.trim().slice(0, 120) || undefined
       : undefined;
 
   return (
@@ -60,6 +69,7 @@ export default async function TutorPage({
         conversationDifficulty={profile.conversationDifficulty}
         practiceMode={practiceMode}
         scenarioId={query.scenario}
+        topic={topic}
         targetMistakeCategories={
           queryTarget ?? targetMistakeCategories
         }
@@ -84,7 +94,6 @@ export default async function TutorPage({
           <div className="pointer-events-none absolute left-0 right-0 top-4 z-20 flex justify-center">
             <StatusPanel />
           </div>
-
 
           <div className="flex h-full w-full flex-1 items-center justify-center">
             <VisualizationPanel />

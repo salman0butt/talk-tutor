@@ -12,6 +12,7 @@ const goalLabels: Record<(typeof LEARNING_GOALS)[number], string> = {
   interview_preparation: "Interview preparation",
   academic_language: "Academic language",
   general_fluency: "General fluency",
+  immigration: "Immigration",
 };
 
 const fieldClass =

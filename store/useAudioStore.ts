@@ -68,6 +68,7 @@ export type AudioStore = {
     conversationDifficulty: ConversationDifficulty;
     practiceMode?: PracticeMode;
     scenarioId?: string;
+    topic?: string;
     targetMistakeCategories?: GrammarCategory[];
   }) => void;
   setSelectedInputDeviceId: (deviceId: string) => void;
@@ -199,9 +200,12 @@ export const useAudioStore = create<AudioStore>()(
                 scenario?.id ??
                 preferences.scenarioId ??
                 current.scenarioId,
+              selectedTopic:
+                scenario?.title ??
+                preferences.topic ??
+                current.selectedTopic,
               ...(scenario
                 ? {
-                    selectedTopic: scenario.title,
                     customScenario: scenario.situation,
                     learnerRole: scenario.learnerRole,
                     tutorRole: scenario.tutorRole,
