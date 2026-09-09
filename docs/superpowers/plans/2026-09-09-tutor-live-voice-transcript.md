@@ -176,5 +176,5 @@
 - [ ] Review the complete diff for correctness, races, resources, state ownership, architecture, tests, and security.
 - [ ] Fix every Critical/Important finding and rerun verification.
 - [ ] Use an interactive browser with microphone/auth when available to verify desktop/mobile `/tutor`, multi-turn transcript, mute, interruption, disconnect, reconnect, and another language.
-- [ ] Push final branch and create a stacked PR targeting `feat/personalized-learning-vocabulary` while PR #3 remains open.
+- [ ] Push the final branch and keep PR #4 targeted directly at `main`; do not merge it without explicit approval.
 - [ ] Leave the PR unmerged.
