@@ -561,14 +561,6 @@ export class LearningRepository {
   async reviewVocabularyItem(
     itemId: string,
     rating: string,
-    next: {
-      easeFactor: number;
-      intervalDays: number;
-      repetitionCount: number;
-      status: string;
-      nextReviewAt: string;
-      lastReviewedAt: string;
-    },
   ): Promise<unknown> {
     if (!isUuid(itemId)) throw new Error("Invalid vocabulary item id.");
     const response = await supabaseRestFetch(
@@ -579,12 +571,6 @@ export class LearningRepository {
         body: JSON.stringify({
           p_item_id: itemId,
           p_rating: rating,
-          p_ease_factor: next.easeFactor,
-          p_interval_days: next.intervalDays,
-          p_repetition_count: next.repetitionCount,
-          p_status: next.status,
-          p_next_review_at: next.nextReviewAt,
-          p_reviewed_at: next.lastReviewedAt,
         }),
       },
     );
