@@ -407,3 +407,41 @@ test('a new transcript session does not inherit streaming buffers from the previ
   assert.equal(newState.outputText, '');
   assert.equal(newState.inputActivityActive, false);
 });
+
+
+test('session end discards speculative interim input but commits observed assistant transcription', () => {
+  let state = createTranscriptState('session-end-policy');
+  state = applyTranscriptEvent(state, {
+    type: 'input-interim',
+    text: 'speculative words',
+    at: 1000,
+  }).state;
+  state = applyTranscriptEvent(state, {
+    type: 'output-transcription',
+    text: 'Observed tutor words',
+    finished: false,
+    at: 1010,
+  }).state;
+
+  const ended = applyTranscriptEvent(state, {
+    type: 'session-end',
+    at: 1020,
+  });
+
+  assert.deepEqual(
+    ended.state.messages.map(({ speaker, text, status }) => ({
+      speaker,
+      text,
+      status,
+    })),
+    [
+      {
+        speaker: 'assistant',
+        text: 'Observed tutor words',
+        status: 'complete',
+      },
+    ],
+  );
+  assert.equal(ended.completed.length, 1);
+  assert.equal(ended.completed[0].speaker, 'assistant');
+});
