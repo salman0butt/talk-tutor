@@ -6,7 +6,7 @@ import {
   type PracticeSessionInput,
 } from "./analytics.ts";
 
-export interface ProgressSessionInput extends PracticeSessionInput {}
+export type ProgressSessionInput = PracticeSessionInput;
 
 export interface PracticeMinutesSummary {
   totalMinutes: number;
