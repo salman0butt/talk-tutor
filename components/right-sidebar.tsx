@@ -1,51 +1,30 @@
 "use client";
+
 import { LucideLanguages } from "lucide-react";
 import {
   Conversation,
   ConversationContent,
   ConversationEmptyState,
+  ConversationScrollButton,
 } from "@/components/ui/conversation";
 import {
   Message,
   MessageAvatar,
   MessageContent,
 } from "@/components/ui/message";
-
 import { cleanText } from "@/lib/utils";
-import SidebarHeader from "./sidebar-header";
 import { useAudioStore } from "@/store/useAudioStore";
-
-// type TranscriptMessage = {
-//   id?: string;
-//   text: string;
-//   isPartial?: boolean;
-//   sender: "user" | "assistant";
-// };
+import SidebarHeader from "./sidebar-header";
 
 function RightSidebar() {
-  const {transcript: items} = useAudioStore();
-  // const items: TranscriptMessage[] = [
-  //   {
-  //     text: "Hii",
-  //     isPartial: false,
-  //     sender: "user",
-  //   },
-  //   {
-  //     text: "I'm Talk Tutor Assistant",
-  //     isPartial: false,
-  //     sender: "assistant",
-  //   },
-  // ];
+  const items = useAudioStore((state) => state.transcriptState.messages);
 
   return (
     <aside className="flex h-full w-full flex-col bg-sidebar text-sidebar-foreground">
-      {/* Header */}
       <SidebarHeader icon={LucideLanguages} title="Transcript" />
 
-      {/* Content */}
       <div className="relative flex-1 overflow-hidden">
         <Conversation className="h-full overflow-y-auto px-3 py-2">
-          {/* Tighter Vertical Spacing (space-y-2) */}
           <ConversationContent className="space-y-2">
             {items.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center opacity-50">
@@ -56,37 +35,45 @@ function RightSidebar() {
                 />
               </div>
             ) : (
-              items.map((message, i) => {
+              items.map((message) => {
                 const cleanedText = cleanText(message.text);
-                if (!cleanedText && !message.isPartial) return null;
-                const isUser = message.sender === "user";
+                const isStreaming = message.status === "streaming";
+                if (!cleanedText && !isStreaming) return null;
+
+                const isUser = message.speaker === "user";
                 return (
                   <Message
-                    key={message.id || i}
+                    key={message.id}
                     from={isUser ? "user" : "assistant"}
                   >
                     <MessageContent
                       className={
                         !isUser
-                          ? `bg-primary! text-primary-foreground!`
+                          ? "bg-primary! text-primary-foreground!"
                           : "bg-secondary! text-secondary-foreground!"
                       }
-                      // variant="contained"
                     >
                       {cleanedText}
-                      {message.isPartial && !isUser && (
-                        <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full opacity-60 animate-bounce align-baseline" />
+                      {isStreaming && (
+                        <span
+                          className="ml-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full opacity-60 align-baseline"
+                          aria-label="Transcribing"
+                        />
                       )}
                     </MessageContent>
 
                     {!isUser && (
-                      <MessageAvatar src="/logo-tutor.png" name="Talk Tutor" />
+                      <MessageAvatar
+                        src="/logo-tutor.png"
+                        name="Talk Tutor"
+                      />
                     )}
                   </Message>
                 );
               })
             )}
           </ConversationContent>
+          <ConversationScrollButton aria-label="Scroll to latest transcript" />
         </Conversation>
       </div>
     </aside>
