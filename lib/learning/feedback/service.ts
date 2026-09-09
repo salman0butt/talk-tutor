@@ -1,13 +1,15 @@
+import { applyFeedbackGuardrails } from "./guardrails.ts";
 import type {
   FeedbackStatus,
   FinalTranscriptMessage,
-  GrammarCorrection,
   SessionFeedback,
 } from "../types.ts";
 import { parseSessionFeedback } from "../validation.ts";
 
 const MAX_FEEDBACK_TURNS = 80;
 const MAX_FEEDBACK_TEXT_CHARS = 24000;
+
+export const FEEDBACK_PROMPT_VERSION = "feedback-v2-evidence-grounded";
 
 export interface FeedbackSession {
   id: string;
@@ -94,48 +96,6 @@ export function buildFeedbackPrompt(input: {
   ].join("\n");
 }
 
-function normalizeEvidenceText(value: string) {
-  return value
-    .normalize("NFKC")
-    .replace(/[\u0000-\u001f\u007f]/g, " ")
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLocaleLowerCase();
-}
-
-export function isCorrectionGrounded(
-  correction: GrammarCorrection,
-  transcript: FinalTranscriptMessage[],
-) {
-  if (!Number.isInteger(correction.sourceSequence)) return false;
-
-  const source = transcript.find(
-    (message) =>
-      message.role === "user" && message.sequence === correction.sourceSequence,
-  );
-  if (!source) return false;
-
-  const sourceText = normalizeEvidenceText(source.text);
-  const original = normalizeEvidenceText(correction.original);
-  const corrected = normalizeEvidenceText(correction.corrected);
-
-  if (!original || original === corrected) return false;
-  return sourceText.includes(original);
-}
-
-export function groundSessionFeedback(
-  feedback: SessionFeedback,
-  transcript: FinalTranscriptMessage[],
-): SessionFeedback {
-  return {
-    ...feedback,
-    grammarCorrections: feedback.grammarCorrections.filter((correction) =>
-      isCorrectionGrounded(correction, transcript),
-    ),
-    pronunciationNotes: [],
-  };
-}
-
 export class FeedbackService {
   private readonly repository: FeedbackRepository;
   private readonly provider: FeedbackProvider;
@@ -179,7 +139,7 @@ export class FeedbackService {
         systemInstruction: FEEDBACK_SYSTEM_INSTRUCTION,
         prompt,
       });
-      const feedback = groundSessionFeedback(
+      const { feedback } = applyFeedbackGuardrails(
         parseSessionFeedback(JSON.parse(raw) as unknown),
         transcript,
       );

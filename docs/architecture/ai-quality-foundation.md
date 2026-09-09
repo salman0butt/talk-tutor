@@ -34,7 +34,8 @@ The PR was therefore simplified.
 | Dashboard / recommendations | They already consume persisted grammar categories. The safest current fix is to prevent new unsupported corrections from being persisted. | No new dashboard/RPC layer |
 | Feedback AI | This is the real correctness boundary. A valid JSON response could still contain an invented correction. | Ground every new correction to actual learner evidence |
 | Vocabulary AI | Current implementation is already isolated and optional. | No new infrastructure |
-| CI / tests | Existing Node tests are the normal project verification path. | Add focused tests there instead of a second deterministic eval runner |
+| CI / tests | Existing Node tests are the normal project verification path. | Run AI golden/adversarial evals through the existing test runner |
+| Guardrails | Prompt isolation and schema validation existed, but the feedback boundary needed explicit post-generation policy. | Add feature-local deterministic guardrails |
 | Observability | Useful later, but there is not yet enough scale or operational need to justify a new persistent AI tracing subsystem. | Deferred |
 
 ## What is implemented
@@ -149,28 +150,24 @@ maintenance and security responsibility without enough immediate product value.
 When that need appears, tracing should be designed once around the actual
 operational questions rather than pre-building a generic subsystem.
 
-## Why a separate eval framework is deferred
+## Guardrails and evals
 
-The current new checks are deterministic software invariants, not semantic
-model-quality evaluations.
+The correctness checks now have explicit AI-engineering surfaces rather than
+being hidden inside the feedback service:
 
-Examples:
+- `lib/learning/feedback/guardrails.ts` contains deterministic post-generation guardrails;
+- `evals/feedback-grounding.json` contains versioned golden, adversarial, and multilingual cases;
+- `tests/learning/ai-evals.test.mjs` executes those cases through the existing `pnpm test` path;
+- `evals/README.md` defines the eval tiers and the boundary between deterministic checks and semantic model-quality evaluation;
+- `docs/architecture/ai-guardrails-evals.md` documents the complete guardrail/eval architecture and advanced AI practices.
 
-- correction points to a real learner turn;
-- assistant text cannot be learner evidence;
-- invented text is discarded;
-- malformed structured output is rejected.
+This deliberately avoids a second CI framework. The evals are real and
+versioned, but deterministic Tier-1 evals use the same repository-native test
+runner as the rest of Talk Tutor.
 
-Those belong in the existing test suite.
-
-A dedicated AI evaluation harness becomes worthwhile when Talk Tutor begins
-running:
-
-- live Gemini outputs against golden datasets;
-- multilingual quality scoring;
-- pairwise prompt/model comparisons;
-- LLM-as-a-judge evaluation;
-- human-calibrated grammar-quality benchmarks.
+Semantic live-model evaluation, pairwise model/prompt comparison,
+LLM-as-a-judge, and human calibration remain the next tier because they require
+paid model calls and quality baselines rather than software-only assertions.
 
 ## Compatibility note
 
@@ -236,18 +233,20 @@ pnpm build
 **Keep now**
 
 - evidence-linked grammar corrections;
-- deterministic grounding;
+- feature-local deterministic guardrails;
 - safer untrusted-data prompt boundary;
 - bounded Gemini feedback request;
-- focused unit tests.
+- code-level prompt versioning;
+- versioned golden/adversarial/multilingual eval fixtures;
+- deterministic AI evals in the existing test suite.
 
 **Do later when justified**
 
 - prompt/model provenance persistence;
 - AI trace database;
-- semantic golden datasets;
-- multilingual model evals;
-- LLM-as-a-judge;
+- live semantic model evals;
+- pairwise model/prompt comparisons;
+- calibrated LLM-as-a-judge;
 - production AI dashboards.
 
 **Do not add for this problem**
