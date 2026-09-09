@@ -1,106 +1,125 @@
 "use client";
 
-import { useState } from "react";
 import { Loader2, Mic, MicOff, PhoneOff } from "lucide-react";
 
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { MicSelector } from "@/components/ui/mic-selector";
+import { cn } from "@/lib/utils";
 import { useAudioStore } from "@/store/useAudioStore";
 import { ConnectionState } from "@/types";
 
 function ControlsPanel() {
-  const [selectedDevice, setSelectedDevice] = useState<string>("");
-  const {connect, disconnect, connectionState, isMuted, toggleMute} = useAudioStore();
-  const isConnected = connectionState === ConnectionState.CONNECTED;
-  const isConnecting = connectionState === ConnectionState.CONNECTING;
+  const {
+    connect,
+    disconnect,
+    connectionState,
+    isMuted,
+    toggleMute,
+    selectedInputDeviceId,
+    setSelectedInputDeviceId,
+  } = useAudioStore();
 
+  const isConnected = connectionState === ConnectionState.CONNECTED;
+  const isRequestingPermission =
+    connectionState === ConnectionState.REQUESTING_PERMISSION;
+  const isConnecting = connectionState === ConnectionState.CONNECTING;
+  const isDisconnecting =
+    connectionState === ConnectionState.DISCONNECTING;
+  const hasActiveAttempt =
+    isConnected || isRequestingPermission || isConnecting || isDisconnecting;
 
   return (
-    <div className="w-full max-w-[90vw] sm:max-w-fit mx-auto transition-all duration-300 ease-in-out">
-      <div className={cn(
-        "flex items-center justify-between sm:justify-center gap-3 sm:gap-4 p-3 sm:p-2",
-        "rounded-2xl sm:rounded-full",
-        "border",
-        "backdrop-blur-xl shadow-xl dark:shadow-black/50",
-        "transition-all duration-300"
-      )}>
-        
-        {/* Mic Selector */}
-        <div className="flex-1 sm:flex-none min-w-0 sm:px-2">
+    <div className="mx-auto w-full max-w-[90vw] transition-all duration-300 ease-in-out sm:max-w-fit">
+      <div
+        className={cn(
+          "flex items-center justify-between gap-3 p-3 sm:justify-center sm:gap-4 sm:p-2",
+          "rounded-2xl sm:rounded-full",
+          "border",
+          "backdrop-blur-xl shadow-xl dark:shadow-black/50",
+          "transition-all duration-300",
+        )}
+      >
+        <div className="min-w-0 flex-1 sm:flex-none sm:px-2">
           <MicSelector
-            value={selectedDevice}
-            onValueChange={setSelectedDevice}
-            // Pass global mute state here to reflect UI changes in the selector too
-            muted={false}
-            onMutedChange={()=>{
-
-            }} 
-            disabled={isConnecting}
-            className="w-full sm:w-auto" 
+            value={selectedInputDeviceId}
+            onValueChange={setSelectedInputDeviceId}
+            muted={isConnected ? isMuted : undefined}
+            onMutedChange={(muted) => {
+              if (isConnected && muted !== isMuted) {
+                toggleMute();
+              }
+            }}
+            disabled={isDisconnecting}
+            className="w-full sm:w-auto"
           />
         </div>
 
-        <div className="hidden sm:block w-px h-8 mx-1" />
+        <div className="mx-1 hidden h-8 w-px sm:block" />
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 shrink-0">
-          
-          {/* 1. MUTE BUTTON (Visible only when Connected) */}
+        <div className="flex shrink-0 items-center gap-2">
           {isConnected && (
             <Button
               onClick={toggleMute}
-              variant={"secondary"}
+              variant="secondary"
               size="icon"
+              aria-label={isMuted ? "Unmute microphone" : "Mute microphone"}
+              aria-pressed={isMuted}
               className={cn(
                 "h-12 w-12 rounded-full",
-                isMuted 
-                  ? "bg-red-100 text-red-600 border-red-200 hover:bg-red-200 dark:bg-red-900/20 dark:text-red-500 dark:border-red-900/50" 
-                  : "bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                isMuted
+                  ? "border-red-200 bg-red-100 text-red-600 hover:bg-red-200 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-500"
+                  : "bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-800",
               )}
             >
-              {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+              {isMuted ? (
+                <MicOff className="h-5 w-5" />
+              ) : (
+                <Mic className="h-5 w-5" />
+              )}
             </Button>
           )}
 
-          {/* 2. CONNECT / DISCONNECT BUTTON */}
-          {!isConnected && !isConnecting ? (
+          {!hasActiveAttempt ? (
             <Button
-              onClick={()=>{
-                connect();
+              onClick={() => {
+                void connect();
               }}
               size="lg"
               className={cn(
-                "rounded-xl sm:rounded-full",
-                "h-12 sm:h-11 px-6",
-                "bg-primary text-primary-foreground font-semibold",
-                "transition-all duration-300 active:scale-95"
+                "h-12 rounded-xl px-6 sm:h-11 sm:rounded-full",
+                "bg-primary font-semibold text-primary-foreground",
+                "transition-all duration-300 active:scale-95",
               )}
             >
-              <Mic className="h-5 w-5 mr-2" />
+              <Mic className="mr-2 h-5 w-5" />
               <span>Connect</span>
             </Button>
           ) : (
             <Button
-              onClick={()=>{
-                disconnect();
+              onClick={() => {
+                void disconnect();
               }}
-              disabled={isConnecting}
+              disabled={isDisconnecting}
               variant="destructive"
               size="lg"
               className={cn(
-                "rounded-xl sm:rounded-full",
-                "h-12 sm:h-11 px-6",
+                "h-12 rounded-xl px-6 sm:h-11 sm:rounded-full",
                 "shadow-md hover:shadow-lg",
-                "transition-all duration-300 active:scale-95"
+                "transition-all duration-300 active:scale-95",
               )}
             >
-              {isConnecting ? (
-                <Loader2 className="h-5 w-5 animate-spin mr-2" />
+              {isDisconnecting ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
               ) : (
-                <PhoneOff className="h-5 w-5 mr-2" />
+                <PhoneOff className="mr-2 h-5 w-5" />
               )}
-              <span>{isConnecting ? "Connecting..." : "End"}</span>
+              <span>
+                {isDisconnecting
+                  ? "Ending..."
+                  : isRequestingPermission || isConnecting
+                    ? "Cancel"
+                    : "End"}
+              </span>
             </Button>
           )}
         </div>
