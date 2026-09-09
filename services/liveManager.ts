@@ -391,8 +391,10 @@ export class LiveManager {
   private handleProviderError(reason: unknown, generation: number) {
     if (!this.isCurrent(generation)) return;
 
-    ++this.generation;
+    const cleanupGeneration = ++this.generation;
     void this.cleanupResources(true).finally(() => {
+      if (!this.isCurrent(cleanupGeneration)) return;
+
       this.callbacks.onStateChange(ConnectionState.ERROR);
       this.reportError(
         {
@@ -408,8 +410,10 @@ export class LiveManager {
   private handleProviderClose(reason: string | undefined, generation: number) {
     if (!this.isCurrent(generation)) return;
 
-    ++this.generation;
+    const cleanupGeneration = ++this.generation;
     void this.cleanupResources(false).finally(() => {
+      if (!this.isCurrent(cleanupGeneration)) return;
+
       this.callbacks.onStateChange(ConnectionState.DISCONNECTED);
       this.reportError(
         {
@@ -505,13 +509,17 @@ export class LiveManager {
     if (!analyser) return;
 
     const samples = new Float32Array(analyser.fftSize);
+    let frame = 0;
     const update = () => {
       if (!this.isCurrent(generation) || this.outputAnalyser !== analyser) {
         return;
       }
 
       analyser.getFloatTimeDomainData(samples);
-      this.callbacks.onAudioLevel(getAudioLevel(samples), "output");
+      frame = (frame + 1) % 3;
+      if (frame === 0) {
+        this.callbacks.onAudioLevel(getAudioLevel(samples), "output");
+      }
       this.outputLevelFrame = requestAnimationFrame(update);
     };
 
