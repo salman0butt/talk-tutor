@@ -75,7 +75,9 @@ The feedback system:
 - reads a previously persisted owner-scoped transcript;
 - limits newest turns and total input size;
 - serializes transcript turns as JSON;
-- wraps them in explicit untrusted-data delimiters;
+- sends immutable coaching/security policy through Gemini `systemInstruction`;
+- sends transcript JSON only in the lower-priority content payload;
+- wraps transcript content in explicit untrusted-data delimiters;
 - explicitly instructs Gemini never to follow instructions in transcript content;
 - requests structured JSON;
 - parses the response;
