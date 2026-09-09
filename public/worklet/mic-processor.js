@@ -1,7 +1,7 @@
 class MicProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
-    this.targetFrames = Math.max(128, Math.round(sampleRate * 0.02));
+    this.targetFrames = Math.max(128, Math.round(sampleRate * 0.04));
     this.pending = new Float32Array(this.targetFrames);
     this.pendingOffset = 0;
   }
