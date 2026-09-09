@@ -49,6 +49,8 @@ export function ProfileForm({ initialProfile }: { initialProfile: LearningProfil
           learningGoal: profile.learningGoal,
           dailyPracticeTargetMinutes: profile.dailyPracticeTargetMinutes,
           timezone: profile.timezone,
+          correctionFrequency: profile.correctionFrequency,
+          conversationDifficulty: profile.conversationDifficulty,
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -104,6 +106,42 @@ export function ProfileForm({ initialProfile }: { initialProfile: LearningProfil
                     {level.label}
                   </option>
                 ))}
+              </select>
+            </label>
+
+            <label className="block text-sm text-white/65">
+              Correction frequency
+              <select
+                className={fieldClass}
+                value={profile.correctionFrequency}
+                onChange={(event) =>
+                  update(
+                    "correctionFrequency",
+                    event.target.value as LearningProfile["correctionFrequency"],
+                  )
+                }
+              >
+                <option value="minimal" className="bg-[#15161c]">Minimal</option>
+                <option value="balanced" className="bg-[#15161c]">Balanced</option>
+                <option value="frequent" className="bg-[#15161c]">Frequent</option>
+              </select>
+            </label>
+
+            <label className="block text-sm text-white/65">
+              Conversation difficulty
+              <select
+                className={fieldClass}
+                value={profile.conversationDifficulty}
+                onChange={(event) =>
+                  update(
+                    "conversationDifficulty",
+                    event.target.value as LearningProfile["conversationDifficulty"],
+                  )
+                }
+              >
+                <option value="easy" className="bg-[#15161c]">Easy</option>
+                <option value="normal" className="bg-[#15161c]">Normal</option>
+                <option value="challenging" className="bg-[#15161c]">Challenging</option>
               </select>
             </label>
 
