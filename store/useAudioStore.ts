@@ -365,8 +365,7 @@ export const useAudioStore = create<AudioStore>()(
             ...practiceConfig,
           });
 
-          let manager: LiveManager;
-          manager = new LiveManager(
+          const manager = new LiveManager(
             {
               onStateChange: (newState) => {
                 if (get().liveManagerInstance !== manager) return;
