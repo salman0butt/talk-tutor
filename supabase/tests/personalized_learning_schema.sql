@@ -14,6 +14,8 @@ begin
       ('profiles', 'correction_frequency'),
       ('profiles', 'conversation_difficulty'),
       ('learning_sessions', 'practice_mode'),
+      ('learning_sessions', 'correction_frequency'),
+      ('learning_sessions', 'conversation_difficulty'),
       ('learning_sessions', 'scenario_id'),
       ('learning_sessions', 'custom_scenario'),
       ('learning_sessions', 'learner_role'),
