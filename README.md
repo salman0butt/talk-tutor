@@ -49,6 +49,7 @@ Persistent learner data is accessed server-side through Supabase PostgREST using
 See:
 
 - `docs/architecture/learning-platform.md`
+- `docs/architecture/live-conversation.md`
 - `docs/security/learning-platform.md`
 - `docs/superpowers/specs/2026-09-09-saas-learning-platform-design.md`
 
@@ -201,6 +202,12 @@ pnpm build
 GitHub Actions additionally starts a disposable PostgreSQL 17 instance, applies the migration against a minimal Supabase-compatible auth stub, and verifies core RLS/policy/grant/ownership metadata.
 
 That CI database check proves migration parsing and expected security objects. It does **not** replace a final integration test against the correctly configured Talk Tutor Supabase project.
+
+## Live voice runtime
+
+The Tutor uses Gemini Live model `gemini-2.5-flash-native-audio-preview-12-2025` for bidirectional native audio. Microphone PCM is sent with the browser audio context's actual sample rate, and Gemini output is decoded as 24 kHz mono PCM.
+
+Realtime transcript state explicitly separates streaming rows from completed history and defensively handles both delta and cumulative provider transcription updates. See `docs/architecture/live-conversation.md` for the complete lifecycle, transcript, playback, interruption, cleanup, and testing model.
 
 ## Existing audio components
 
