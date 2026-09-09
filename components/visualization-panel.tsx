@@ -5,9 +5,16 @@ import { Orb } from "@/components/ui/orb";
 import { LiveWaveform } from "./ui/live-waveform";
 import { useAudioStore } from "@/store/useAudioStore";
 import { ConnectionState } from "@/types";
+import { useShallow } from "zustand/react/shallow";
 
 function VisualizationPanel() {
-  const { connectionState, audioLevel, agentState } = useAudioStore();
+  const { connectionState, audioLevel, agentState } = useAudioStore(
+    useShallow((state) => ({
+      connectionState: state.connectionState,
+      audioLevel: state.audioLevel,
+      agentState: state.agentState,
+    })),
+  );
   const isConnected = connectionState === ConnectionState.CONNECTED;
   const isConnecting = connectionState === ConnectionState.CONNECTING;
 
