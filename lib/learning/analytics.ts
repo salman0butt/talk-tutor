@@ -36,19 +36,32 @@ export function isMeaningfulPracticeSession(session: PracticeSessionInput): bool
   return session.status === "completed" && Number.isFinite(session.durationSeconds)
     && session.durationSeconds >= 60 && Number.isInteger(session.userMessageCount) && session.userMessageCount > 0;
 }
-export function calculatePracticeStreak(sessions: PracticeSessionInput[], timeZone: string, now: string | Date = new Date()): number {
-  const days = new Set(sessions.filter(isMeaningfulPracticeSession).map((session) => localDateKey(session.endedAt, timeZone)));
+export function calculateDateKeyStreak(dateKeys: string[], todayKey: string): number {
+  const days = new Set(dateKeys.filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value)));
   if (days.size === 0) return 0;
-  const today = localDateKey(now, timeZone);
-  const yesterday = previousDateKey(today);
-  let cursor: string | null = days.has(today) ? today : days.has(yesterday) ? yesterday : null;
+
+  const yesterday = previousDateKey(todayKey);
+  let cursor: string | null = days.has(todayKey)
+    ? todayKey
+    : days.has(yesterday)
+      ? yesterday
+      : null;
+
   if (!cursor) return 0;
+
   let streak = 0;
   while (cursor && days.has(cursor)) {
     streak += 1;
     cursor = previousDateKey(cursor);
   }
   return streak;
+}
+
+export function calculatePracticeStreak(sessions: PracticeSessionInput[], timeZone: string, now: string | Date = new Date()): number {
+  const days = sessions
+    .filter(isMeaningfulPracticeSession)
+    .map((session) => localDateKey(session.endedAt, timeZone));
+  return calculateDateKeyStreak(days, localDateKey(now, timeZone));
 }
 export function normalizeVocabularyTerm(term: string): string {
   return term.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase();
