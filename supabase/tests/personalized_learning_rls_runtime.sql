@@ -51,16 +51,7 @@ begin
     and normalized_term = 'departure'
   limit 1;
 
-  perform public.review_vocabulary_item(
-    v_item_id,
-    'good',
-    2.50,
-    1,
-    1,
-    'learning',
-    '2026-09-10T12:00:00Z',
-    '2026-09-09T12:00:00Z'
-  );
+  perform public.review_vocabulary_item(v_item_id, 'good');
 
   if not exists (
     select 1
