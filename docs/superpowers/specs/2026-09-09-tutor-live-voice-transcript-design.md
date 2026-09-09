@@ -2,7 +2,7 @@
 
 ## Status
 
-Implementation design for the focused `/tutor` realtime voice/transcript repair. This branch is stacked on `feat/personalized-learning-vocabulary` because that open branch contains the newest Tutor/session persistence behavior.
+Implementation design for the focused `/tutor` realtime voice/transcript repair. The prerequisite personalized-learning work is merged, so the pull request now integrates directly against `main`.
 
 ## Problem
 
@@ -126,7 +126,7 @@ Rules:
 
 - interim user text updates the current user row in place;
 - final input fragments accumulate without duplicating interim snapshots;
-- the first assistant output fragment finalizes the current user turn before creating/updating the assistant row;
+- assistant output never prematurely finalizes a pending user turn; optional transcription `finished`, guarded `turnComplete`, a subsequent input boundary, and session end provide deterministic finalization;
 - model `turnComplete` finalizes assistant output and provides a fallback user flush when needed;
 - interruption finalizes the currently observed assistant text once, clears its streaming buffer, and resets playback;
 - whitespace cannot create a row;
@@ -162,7 +162,7 @@ The input `AudioContext` may request 16 kHz, but PCM MIME metadata uses the cont
 
 PCM conversion remains a pure utility with deterministic tests for clamping, zero, byte length, and MIME sample rate.
 
-The worklet batches render quanta into roughly 20 ms messages before posting to the main thread, reducing needless realtime send/state-update frequency without adding a buffering subsystem.
+The worklet batches render quanta into roughly 40 ms messages before posting to the main thread, reducing needless realtime send/state-update frequency while staying within Gemini Live's recommended realtime chunk range.
 
 ## Playback
 
