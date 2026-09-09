@@ -9,7 +9,7 @@ import {
 import { requireAuthenticatedUserId } from "@/lib/learning/ownership";
 import { LearningRepository } from "@/lib/learning/repository";
 import type { LearningProfilePatch } from "@/lib/learning/types";
-import { parseProfilePatch } from "@/lib/learning/validation";
+import { isUuid, parseProfilePatch } from "@/lib/learning/validation";
 
 export class LearningAuthenticationError extends Error {
   readonly status = 401;
@@ -62,5 +62,39 @@ export async function getDashboardViewModel() {
     streak: calculateDateKeyStreak(snapshot.practiceDates, today),
     fluencyTrend: summarizeFluencyTrend([...snapshot.recentScores].reverse()),
     recentSessions,
+  };
+}
+
+
+export async function getHistoryViewModel() {
+  const repository = await requireLearningRepository();
+  const [profile, sessions] = await Promise.all([
+    repository.ensureProfile(),
+    repository.listSessions(50),
+  ]);
+  return { profile, sessions };
+}
+
+export async function getSessionReviewViewModel(sessionId: string) {
+  if (!isUuid(sessionId)) return null;
+
+  const repository = await requireLearningRepository();
+  const session = await repository.getSession(sessionId);
+  if (!session || session.status !== "completed") return null;
+
+  const [profile, messages, feedback] = await Promise.all([
+    repository.ensureProfile(),
+    repository.getMessages(sessionId),
+    repository.getFeedback(sessionId),
+  ]);
+
+  return {
+    profile,
+    session: {
+      ...session,
+      userMessageCount: messages.filter((message) => message.role === "user").length,
+    },
+    messages,
+    feedback,
   };
 }
