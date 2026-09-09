@@ -224,13 +224,7 @@ $$;
 
 create or replace function public.review_vocabulary_item(
   p_item_id uuid,
-  p_rating text,
-  p_ease_factor numeric,
-  p_interval_days integer,
-  p_repetition_count integer,
-  p_status text,
-  p_next_review_at timestamptz,
-  p_reviewed_at timestamptz
+  p_rating text
 )
 returns jsonb
 language plpgsql
@@ -240,18 +234,19 @@ as $$
 declare
   v_user_id uuid := auth.uid();
   v_item public.vocabulary_items%rowtype;
+  v_ease numeric(4,2);
+  v_interval integer;
+  v_repetitions integer;
+  v_status text;
+  v_reviewed_at timestamptz := clock_timestamp();
+  v_next_review_at timestamptz;
 begin
   if v_user_id is null then
     raise exception 'authentication required' using errcode = '42501';
   end if;
 
-  if p_rating not in ('again','hard','good','easy')
-     or p_ease_factor < 1.30 or p_ease_factor > 3.00
-     or p_interval_days < 1 or p_interval_days > 3650
-     or p_repetition_count < 0 or p_repetition_count > 10000
-     or p_status not in ('learning','strong')
-     or p_next_review_at <= p_reviewed_at then
-    raise exception 'invalid vocabulary review state' using errcode = '22023';
+  if p_rating not in ('again','hard','good','easy') then
+    raise exception 'invalid vocabulary review rating' using errcode = '22023';
   end if;
 
   select * into v_item
@@ -262,6 +257,49 @@ begin
   if not found then
     raise exception 'vocabulary item not found' using errcode = 'P0002';
   end if;
+
+  v_ease := v_item.ease_factor;
+  v_interval := v_item.interval_days;
+  v_repetitions := v_item.repetition_count;
+
+  if p_rating = 'again' then
+    v_ease := greatest(1.30, least(3.00, round(v_ease - 0.20, 2)));
+    v_interval := 1;
+    v_repetitions := 0;
+  elsif p_rating = 'hard' then
+    v_ease := greatest(1.30, least(3.00, round(v_ease - 0.15, 2)));
+    v_interval := greatest(1, round(v_interval * 1.20)::integer);
+    v_repetitions := v_repetitions + 1;
+  elsif p_rating = 'good' then
+    if v_repetitions = 0 then
+      v_interval := 1;
+    elsif v_repetitions = 1 then
+      v_interval := 3;
+    else
+      v_interval := greatest(1, round(v_interval * v_ease)::integer);
+    end if;
+    v_repetitions := v_repetitions + 1;
+  else
+    v_ease := greatest(1.30, least(3.00, round(v_ease + 0.15, 2)));
+    if v_repetitions = 0 then
+      v_interval := 3;
+    elsif v_repetitions = 1 then
+      v_interval := 7;
+    else
+      v_interval := greatest(
+        1,
+        round(v_interval * v_item.ease_factor * 1.30)::integer
+      );
+    end if;
+    v_repetitions := v_repetitions + 1;
+  end if;
+
+  v_interval := least(3650, greatest(1, v_interval));
+  v_status := case
+    when v_repetitions >= 5 and v_interval >= 21 then 'strong'
+    else 'learning'
+  end;
+  v_next_review_at := v_reviewed_at + make_interval(days => v_interval);
 
   insert into public.vocabulary_reviews (
     vocabulary_item_id,
@@ -275,30 +313,30 @@ begin
     v_user_id,
     p_rating,
     v_item.interval_days,
-    p_interval_days,
-    p_reviewed_at
+    v_interval,
+    v_reviewed_at
   );
 
   update public.vocabulary_items
   set
-    ease_factor = p_ease_factor,
-    interval_days = p_interval_days,
-    repetition_count = p_repetition_count,
-    status = p_status,
-    next_review_at = p_next_review_at,
-    last_reviewed_at = p_reviewed_at,
-    updated_at = now()
+    ease_factor = v_ease,
+    interval_days = v_interval,
+    repetition_count = v_repetitions,
+    status = v_status,
+    next_review_at = v_next_review_at,
+    last_reviewed_at = v_reviewed_at,
+    updated_at = v_reviewed_at
   where id = v_item.id and user_id = v_user_id;
 
   return jsonb_build_object(
     'id', v_item.id,
     'rating', p_rating,
-    'easeFactor', p_ease_factor,
-    'intervalDays', p_interval_days,
-    'repetitionCount', p_repetition_count,
-    'status', p_status,
-    'nextReviewAt', p_next_review_at,
-    'lastReviewedAt', p_reviewed_at
+    'easeFactor', v_ease,
+    'intervalDays', v_interval,
+    'repetitionCount', v_repetitions,
+    'status', v_status,
+    'nextReviewAt', v_next_review_at,
+    'lastReviewedAt', v_reviewed_at
   );
 end;
 $$;
@@ -637,11 +675,11 @@ select jsonb_build_object(
 $$;
 
 revoke all on function public.save_vocabulary_item(text,text,text,text,text,uuid,text) from public, anon;
-revoke all on function public.review_vocabulary_item(uuid,text,numeric,integer,integer,text,timestamptz,timestamptz) from public, anon;
+revoke all on function public.review_vocabulary_item(uuid,text) from public, anon;
 revoke all on function public.get_vocabulary_overview() from public, anon;
 revoke all on function public.start_learning_session(text,text,text,text,jsonb,text,text,text,text,text,text[],text,text) from public, anon;
 
 grant execute on function public.save_vocabulary_item(text,text,text,text,text,uuid,text) to authenticated;
-grant execute on function public.review_vocabulary_item(uuid,text,numeric,integer,integer,text,timestamptz,timestamptz) to authenticated;
+grant execute on function public.review_vocabulary_item(uuid,text) to authenticated;
 grant execute on function public.get_vocabulary_overview() to authenticated;
 grant execute on function public.start_learning_session(text,text,text,text,jsonb,text,text,text,text,text,text[],text,text) to authenticated;
