@@ -135,6 +135,31 @@ export const useAudioStore = create<AudioStore>()(
         set({ error: liveError.message });
       };
 
+      const applyTranscriptForRecorder = (
+        event: Parameters<typeof applyTranscriptEvent>[1],
+        recorder: LearningSessionRecorder,
+      ) => {
+        const transition = applyTranscriptEvent(
+          get().transcriptState,
+          event,
+        );
+        set({ transcriptState: transition.state });
+
+        for (const message of transition.completed) {
+          void recorder
+            .recordFinalTurn(
+              message.speaker === "assistant"
+                ? "assistant"
+                : "user",
+              message.text,
+              new Date(
+                message.completedAt ?? event.at,
+              ).toISOString(),
+            )
+            .catch(reportSessionPersistenceError);
+        }
+      };
+
       return {
         connectionState: ConnectionState.DISCONNECTED,
         error: null,
@@ -381,26 +406,7 @@ export const useAudioStore = create<AudioStore>()(
 
               onTranscriptEvent: (event) => {
                 if (activeManager !== manager) return;
-
-                const transition = applyTranscriptEvent(
-                  get().transcriptState,
-                  event,
-                );
-                set({ transcriptState: transition.state });
-
-                for (const message of transition.completed) {
-                  void recorder
-                    .recordFinalTurn(
-                      message.speaker === "assistant"
-                        ? "assistant"
-                        : "user",
-                      message.text,
-                      new Date(
-                        message.completedAt ?? event.at,
-                      ).toISOString(),
-                    )
-                    .catch(reportSessionPersistenceError);
-                }
+                applyTranscriptForRecorder(event, recorder);
               },
 
               onAudioLevel: (level, type) => {
@@ -424,8 +430,13 @@ export const useAudioStore = create<AudioStore>()(
               },
 
               onSessionClosed: () => {
-                void recorder.finalize().catch(reportSessionPersistenceError);
                 if (activeManager !== manager) return;
+
+                applyTranscriptForRecorder(
+                  { type: "session-end", at: Date.now() },
+                  recorder,
+                );
+                void recorder.finalize().catch(reportSessionPersistenceError);
 
                 activeManager = null;
                 activeRecorder = null;
@@ -461,6 +472,10 @@ export const useAudioStore = create<AudioStore>()(
             activeManager === manager &&
             get().connectionState === ConnectionState.ERROR
           ) {
+            applyTranscriptForRecorder(
+              { type: "session-end", at: Date.now() },
+              recorder,
+            );
             await recorder.finalize().catch(reportSessionPersistenceError);
             activeManager = null;
             activeRecorder = null;
@@ -477,11 +492,25 @@ export const useAudioStore = create<AudioStore>()(
 
           const manager = activeManager;
           const recorder = activeRecorder;
+          if (
+            !manager &&
+            !recorder &&
+            get().connectionState === ConnectionState.DISCONNECTED
+          ) {
+            return;
+          }
 
           set({
             connectionState: ConnectionState.DISCONNECTING,
             agentState: null,
           });
+
+          if (recorder) {
+            applyTranscriptForRecorder(
+              { type: "session-end", at: Date.now() },
+              recorder,
+            );
+          }
 
           const results = await Promise.allSettled([
             manager?.disconnect(),
