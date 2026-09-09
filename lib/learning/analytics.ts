@@ -1,3 +1,4 @@
+import type { DashboardSnapshot } from "./types.ts";
 export interface PracticeSessionInput {
   endedAt: string;
   durationSeconds: number;
@@ -89,4 +90,81 @@ export function summarizeFluencyTrend(scores: number[]): FluencyTrend {
   const current = average(clean.slice(-window));
   const previous = average(clean.slice(0, Math.max(0, clean.length - window)));
   return { current, previous, delta: current !== null && previous !== null ? current - previous : null };
+}
+
+
+function safeCount(value: unknown): number {
+  return Number.isInteger(value) && Number(value) >= 0 ? Number(value) : 0;
+}
+
+export function normalizeDashboardSnapshot(input: unknown): DashboardSnapshot {
+  const data =
+    input && typeof input === "object" && !Array.isArray(input)
+      ? (input as Record<string, unknown>)
+      : {};
+
+  const weeklyPractice = Array.isArray(data.weeklyPractice)
+    ? data.weeklyPractice
+        .filter(
+          (item): item is { date: string; minutes: number } =>
+            Boolean(
+              item &&
+                typeof item === "object" &&
+                /^\d{4}-\d{2}-\d{2}$/.test(
+                  String((item as Record<string, unknown>).date ?? ""),
+                ) &&
+                Number.isInteger((item as Record<string, unknown>).minutes) &&
+                Number((item as Record<string, unknown>).minutes) >= 0,
+            ),
+        )
+        .map((item) => ({ date: item.date, minutes: item.minutes }))
+    : [];
+
+  const commonMistakes = Array.isArray(data.commonMistakes)
+    ? data.commonMistakes
+        .filter((item): item is { category: string; count: number } => {
+          if (!item || typeof item !== "object") return false;
+          const row = item as Record<string, unknown>;
+          return (
+            typeof row.category === "string" &&
+            row.category.trim().length > 0 &&
+            Number.isInteger(row.count) &&
+            Number(row.count) > 0
+          );
+        })
+        .map((item) => ({ category: item.category.trim(), count: item.count }))
+    : [];
+
+  const recentLanguages = Array.isArray(data.recentLanguages)
+    ? data.recentLanguages.filter(
+        (value): value is string =>
+          typeof value === "string" && value.trim().length > 0,
+      )
+    : [];
+
+  const recentScores = Array.isArray(data.recentScores)
+    ? data.recentScores.filter(
+        (value): value is number =>
+          Number.isInteger(value) && Number(value) >= 0 && Number(value) <= 100,
+      )
+    : [];
+
+  const practiceDates = Array.isArray(data.practiceDates)
+    ? data.practiceDates.filter(
+        (value): value is string =>
+          typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value),
+      )
+    : [];
+
+  return {
+    totalMinutes: safeCount(data.totalMinutes),
+    completedSessions: safeCount(data.completedSessions),
+    sessionsThisWeek: safeCount(data.sessionsThisWeek),
+    vocabularyLearned: safeCount(data.vocabularyLearned),
+    weeklyPractice,
+    commonMistakes,
+    recentLanguages,
+    recentScores,
+    practiceDates,
+  };
 }
