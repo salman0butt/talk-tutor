@@ -7,6 +7,11 @@ import {
   localDateKey,
   summarizeFluencyTrend,
 } from "@/lib/learning/analytics";
+import {
+  calculateSkillTrend,
+  calculateStreakSummary,
+} from "@/lib/learning/progress";
+import { buildRecommendedPractice } from "@/lib/learning/recommendations";
 import { requireAuthenticatedUserId } from "@/lib/learning/ownership";
 import { selectTargetMistakes } from "@/lib/learning/practice";
 import { LearningRepository } from "@/lib/learning/repository";
@@ -58,12 +63,33 @@ export async function getDashboardViewModel() {
 
   const today = localDateKey(new Date(), profile.timezone);
 
+  const streakSummary = calculateStreakSummary(
+    snapshot.practiceDates.map((dateKey) => ({
+      endedAt: `${dateKey}T12:00:00.000Z`,
+      durationSeconds: 60,
+      userMessageCount: 1,
+      status: "completed",
+    })),
+    "UTC",
+    `${today}T12:00:00.000Z`,
+  );
+  const recommendations = buildRecommendedPractice({
+    dueVocabularyCount: snapshot.vocabularyDue,
+    mistakes: snapshot.commonMistakes,
+    minutesToday: snapshot.minutesToday,
+    dailyTargetMinutes: profile.dailyPracticeTargetMinutes,
+    learningGoal: profile.learningGoal,
+  });
+
   return {
     profile,
     snapshot,
     streak: calculateDateKeyStreak(snapshot.practiceDates, today),
-    fluencyTrend: summarizeFluencyTrend([...snapshot.recentScores].reverse()),
+    streakSummary,
+    skillTrend: calculateSkillTrend(snapshot.recentScores),
+    fluencyTrend: summarizeFluencyTrend(snapshot.recentScores),
     weeklyPractice: buildWeeklyPracticeSeries(snapshot.weeklyPractice, today, 7),
+    recommendations,
     recentSessions,
   };
 }
