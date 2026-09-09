@@ -3,7 +3,7 @@ name: Learning Platform CI
 on:
   push:
     branches:
-      - feat/saas-learning-platform
+      - feat/personalized-learning-vocabulary
   pull_request:
     branches:
       - main
@@ -72,8 +72,11 @@ jobs:
         run: |
           psql -v ON_ERROR_STOP=1 -f supabase/tests/bootstrap_ci.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260909000000_learning_platform.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260909090000_personalized_learning_vocabulary.sql
           psql -v ON_ERROR_STOP=1 -f supabase/tests/learning_platform_schema.sql
           psql -v ON_ERROR_STOP=1 -f supabase/tests/learning_platform_rls_runtime.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/personalized_learning_schema.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/personalized_learning_rls_runtime.sql
 
       - name: Production build
         run: pnpm build

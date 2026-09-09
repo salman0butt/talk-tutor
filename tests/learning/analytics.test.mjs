@@ -161,14 +161,30 @@ test('dashboard snapshot normalization rejects malformed metrics without inventi
     }),
     {
       totalMinutes: 0,
+      thisWeekMinutes: 0,
+      thisMonthMinutes: 0,
+      previousWeekMinutes: 0,
+      minutesToday: 0,
       completedSessions: 0,
       sessionsThisWeek: 3,
       vocabularyLearned: 7,
+      vocabularySaved: 0,
+      vocabularyLearning: 0,
+      vocabularyStrong: 0,
+      vocabularyDue: 0,
+      newVocabularyThisWeek: 0,
       weeklyPractice: [{ date: '2026-09-09', minutes: 12 }],
-      commonMistakes: [{ category: 'articles', count: 4 }],
+      commonMistakes: [{
+        category: 'articles',
+        count: 4,
+        affectedSessions: 0,
+        recentCount: 0,
+        previousCount: 0,
+      }],
       recentLanguages: ['en-US'],
       recentScores: [70],
       practiceDates: ['2026-09-09'],
+      vocabularyGrowth: [],
     },
   );
 });
@@ -189,5 +205,64 @@ test('weekly practice series fills missing local dates with zero minutes', () =>
       { date: '2026-09-08', minutes: 0 },
       { date: '2026-09-09', minutes: 18 },
     ],
+  );
+});
+
+
+test('dashboard snapshot normalization preserves validated personalized progress metrics', () => {
+  assert.deepEqual(
+    normalizeDashboardSnapshot({
+      totalMinutes: 320,
+      thisWeekMinutes: 42,
+      thisMonthMinutes: 111,
+      previousWeekMinutes: 35,
+      minutesToday: 14,
+      completedSessions: 24,
+      sessionsThisWeek: 4,
+      vocabularyLearned: 84,
+      vocabularySaved: 60,
+      vocabularyLearning: 38,
+      vocabularyStrong: 22,
+      vocabularyDue: 12,
+      newVocabularyThisWeek: 7,
+      commonMistakes: [{
+        category: 'articles',
+        count: 12,
+        affectedSessions: 6,
+        recentCount: 3,
+        previousCount: 6,
+      }],
+      vocabularyGrowth: [
+        { date: '2026-09-08', count: 2 },
+        { date: 'bad', count: 9 },
+      ],
+    }),
+    {
+      totalMinutes: 320,
+      thisWeekMinutes: 42,
+      thisMonthMinutes: 111,
+      previousWeekMinutes: 35,
+      minutesToday: 14,
+      completedSessions: 24,
+      sessionsThisWeek: 4,
+      vocabularyLearned: 84,
+      vocabularySaved: 60,
+      vocabularyLearning: 38,
+      vocabularyStrong: 22,
+      vocabularyDue: 12,
+      newVocabularyThisWeek: 7,
+      weeklyPractice: [],
+      commonMistakes: [{
+        category: 'articles',
+        count: 12,
+        affectedSessions: 6,
+        recentCount: 3,
+        previousCount: 6,
+      }],
+      recentLanguages: [],
+      recentScores: [],
+      practiceDates: [],
+      vocabularyGrowth: [{ date: '2026-09-08', count: 2 }],
+    },
   );
 });

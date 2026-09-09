@@ -15,6 +15,7 @@ import {
 } from "@google/genai";
 import { base64ToUint8Array, createPCMBlob, decodeAudioData, getAudioLevel, } from "../lib/audioUtils";
 import { ConnectConfig, ConnectionState, LiveManagerCallbacks } from "@/types";
+import { buildTutorSystemInstruction } from "@/lib/learning/practice";
 export class LiveManager {
     private ai: GoogleGenAI;
     private activeSession: Session | null = null;
@@ -168,22 +169,12 @@ export class LiveManager {
 
 
   generateSystemPrompt(config: ConnectConfig) {
-    return `
-    ROLE: You are an expert language tutor. Your name is "Talk Tutor".
-
-    GOAL: Help the user improve their proficiency in ${config.selected_launguage_name} (${config.selected_launguage_region}).
-    TOPIC: ${config.selected_topic}.
-    USER LEVEL: ${config.selected_proefficent_level}.
-
-    INSTRUCTIONS:
-    1.  **Strictly** speak in ${config.selected_launguage_name}. Only use English if the user is completely stuck or asks for a translation.
-    2.  **Correction Mode**:
-        - If the user makes a grammar or pronunciation mistake, gently correct it *first*, then continue the conversation.
-        - Format: "Small tip: In ${config.selected_launguage_name} we say [Correction]. Anyway, [Response]?"
-    3.  **Conversation Flow**:
-        - Keep responses concise (1-3 sentences).
-        - Ask open-ended questions to keep the user talking.
-    `;
+    return buildTutorSystemInstruction({
+      languageName: config.selected_launguage_name,
+      languageRegion: config.selected_launguage_region,
+      proficiencyLevel: config.selected_proefficent_level,
+      config: config.practice_config,
+    });
   }
 
 

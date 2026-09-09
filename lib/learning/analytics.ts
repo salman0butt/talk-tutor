@@ -122,7 +122,7 @@ export function normalizeDashboardSnapshot(input: unknown): DashboardSnapshot {
 
   const commonMistakes = Array.isArray(data.commonMistakes)
     ? data.commonMistakes
-        .filter((item): item is { category: string; count: number } => {
+        .filter((item) => {
           if (!item || typeof item !== "object") return false;
           const row = item as Record<string, unknown>;
           return (
@@ -132,7 +132,34 @@ export function normalizeDashboardSnapshot(input: unknown): DashboardSnapshot {
             Number(row.count) > 0
           );
         })
-        .map((item) => ({ category: item.category.trim(), count: item.count }))
+        .map((item) => {
+          const row = item as Record<string, unknown>;
+          return {
+            category: String(row.category).trim(),
+            count: safeCount(row.count),
+            affectedSessions: safeCount(row.affectedSessions),
+            recentCount: safeCount(row.recentCount),
+            previousCount: safeCount(row.previousCount),
+          };
+        })
+    : [];
+
+  const vocabularyGrowth = Array.isArray(data.vocabularyGrowth)
+    ? data.vocabularyGrowth
+        .filter((item) => {
+          if (!item || typeof item !== "object") return false;
+          const row = item as Record<string, unknown>;
+          return (
+            typeof row.date === "string" &&
+            /^\d{4}-\d{2}-\d{2}$/.test(row.date) &&
+            Number.isInteger(row.count) &&
+            Number(row.count) >= 0
+          );
+        })
+        .map((item) => {
+          const row = item as Record<string, unknown>;
+          return { date: String(row.date), count: safeCount(row.count) };
+        })
     : [];
 
   const recentLanguages = Array.isArray(data.recentLanguages)
@@ -158,14 +185,24 @@ export function normalizeDashboardSnapshot(input: unknown): DashboardSnapshot {
 
   return {
     totalMinutes: safeCount(data.totalMinutes),
+    thisWeekMinutes: safeCount(data.thisWeekMinutes),
+    thisMonthMinutes: safeCount(data.thisMonthMinutes),
+    previousWeekMinutes: safeCount(data.previousWeekMinutes),
+    minutesToday: safeCount(data.minutesToday),
     completedSessions: safeCount(data.completedSessions),
     sessionsThisWeek: safeCount(data.sessionsThisWeek),
     vocabularyLearned: safeCount(data.vocabularyLearned),
+    vocabularySaved: safeCount(data.vocabularySaved),
+    vocabularyLearning: safeCount(data.vocabularyLearning),
+    vocabularyStrong: safeCount(data.vocabularyStrong),
+    vocabularyDue: safeCount(data.vocabularyDue),
+    newVocabularyThisWeek: safeCount(data.newVocabularyThisWeek),
     weeklyPractice,
     commonMistakes,
     recentLanguages,
     recentScores,
     practiceDates,
+    vocabularyGrowth,
   };
 }
 

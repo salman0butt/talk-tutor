@@ -1,3 +1,4 @@
+import type { PracticeConfiguration } from "@/lib/learning/practice";
 export enum ConnectionState {
   DISCONNECTED = 'DISCONNECTED',
   CONNECTING = 'CONNECTING',
@@ -44,4 +45,5 @@ export interface ConnectConfig {
   context: string;
   selected_proefficent_level: string;
   selected_assistant_voice: string;
+  practice_config: PracticeConfiguration;
 }

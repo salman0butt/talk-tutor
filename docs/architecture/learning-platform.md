@@ -236,3 +236,10 @@ Dashboard history aggregation is one security-invoker RPC plus a small recent-se
 - no background job system;
 - no standardized language proficiency score;
 - no cross-user/social features.
+
+
+## Personalized learning extension
+
+The next schema extension is documented in `docs/architecture/personalized-learning-vocabulary.md`. It deliberately reuses this authentication, session, transcript, feedback, PostgREST, and RLS architecture rather than creating parallel learner-history tables.
+
+The dashboard RPC now includes period practice totals, vocabulary state counts, mistake comparison windows, and vocabulary growth. Personalized practice metadata is stored on the same `learning_sessions` row as the conversation it configured.

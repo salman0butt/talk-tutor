@@ -3,13 +3,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BarChart3, BookOpenText, LogOut, Mic2, UserRound } from "lucide-react";
+import { BarChart3, BookOpenText, LibraryBig, LogOut, Mic2, UserRound } from "lucide-react";
 import { useState } from "react";
 
 const links = [
   { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
   { href: "/tutor", label: "Practice", icon: Mic2 },
   { href: "/history", label: "History", icon: BookOpenText },
+  { href: "/vocabulary", label: "Vocabulary", icon: LibraryBig },
   { href: "/profile", label: "Profile", icon: UserRound },
 ];
 
@@ -74,7 +75,7 @@ export function AppNav({ displayName }: { displayName?: string }) {
       </header>
 
       <nav
-        className="fixed inset-x-3 bottom-3 z-50 grid grid-cols-4 rounded-2xl border border-white/10 bg-[#111218]/95 p-1.5 shadow-2xl shadow-black/50 backdrop-blur-xl md:hidden"
+        className="fixed inset-x-3 bottom-3 z-50 grid grid-cols-5 rounded-2xl border border-white/10 bg-[#111218]/95 p-1.5 shadow-2xl shadow-black/50 backdrop-blur-xl md:hidden"
         aria-label="Mobile learning navigation"
       >
         {links.map(({ href, label, icon: Icon }) => {

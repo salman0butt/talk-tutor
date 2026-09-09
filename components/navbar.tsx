@@ -10,6 +10,7 @@ import RightSidebar from "@/components/right-sidebar";
 
 import {
   BookOpenText,
+  LibraryBig,
   LayoutDashboard,
   LoaderCircle,
   LogOut,
@@ -71,6 +72,10 @@ export function Navbar({ userEmail }: { userEmail?: string }) {
                     <BookOpenText className="h-4 w-4" />
                     History
                   </Link>
+                  <Link href="/vocabulary" className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <LibraryBig className="h-4 w-4" />
+                    Vocabulary
+                  </Link>
                   <Link href="/profile" className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <UserRound className="h-4 w-4" />
                     Profile
@@ -91,6 +96,12 @@ export function Navbar({ userEmail }: { userEmail?: string }) {
               <Link href="/history">
                 <BookOpenText className="h-4 w-4" />
                 History
+              </Link>
+            </Button>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/vocabulary">
+                <LibraryBig className="h-4 w-4" />
+                Vocabulary
               </Link>
             </Button>
             <Button asChild variant="ghost" size="sm">

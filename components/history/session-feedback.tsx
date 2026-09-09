@@ -7,15 +7,18 @@ import {
 } from "lucide-react";
 import type { FeedbackStatus, SessionFeedback } from "@/lib/learning/types";
 import { FeedbackRetryButton } from "@/components/history/feedback-retry-button";
+import { SaveWordButton } from "@/components/vocabulary/save-word-button";
 
 export function SessionFeedbackView({
   feedback,
   status,
   sessionId,
+  language,
 }: {
   feedback: SessionFeedback | null;
   status: FeedbackStatus;
   sessionId: string;
+  language: string;
 }) {
   if (!feedback) {
     const failed = status === "failed";
@@ -174,6 +177,13 @@ export function SessionFeedbackView({
                     “{item.example}”
                   </p>
                 )}
+                <SaveWordButton
+                  term={item.term}
+                  meaning={item.meaning}
+                  exampleSentence={item.example}
+                  language={language}
+                  sessionId={sessionId}
+                />
               </article>
             ))}
           </div>

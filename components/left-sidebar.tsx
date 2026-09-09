@@ -1,171 +1,321 @@
 "use client";
 
 import {
-  Settings2,
-  Globe,
   GraduationCap,
+  Globe,
   MessageSquare,
   Mic,
   Palette,
-  LucideIcon,
+  Settings2,
+  Sparkles,
+  Target,
+  UsersRound,
 } from "lucide-react";
-
-import { cn } from "@/lib/utils";
-
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
 import { ModeToggle } from "@/components/mode-toggle";
-
 import {
   AVAILABLE_LANGUAGES,
-  AVAILABLE_VOICES,
   AVAILABLE_PROFICIENCY_LEVELS,
   AVAILABLE_TOPICS,
+  AVAILABLE_VOICES,
 } from "@/lib/constants";
-import SidebarHeader from "./sidebar-header";
+import {
+  PRACTICE_SCENARIOS,
+  type ConversationDifficulty,
+  type CorrectionFrequency,
+  type PracticeMode,
+} from "@/lib/learning/practice";
+import {
+  GRAMMAR_CATEGORIES,
+  type GrammarCategory,
+} from "@/lib/learning/types";
 import { useAudioStore } from "@/store/useAudioStore";
+import { ConnectionState } from "@/types";
+import SidebarHeader from "./sidebar-header";
+
+const fieldClass =
+  "mt-2 min-h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50";
+
+const mistakeLabels: Record<GrammarCategory, string> = {
+  articles: "Articles",
+  verb_tense: "Verb tense",
+  prepositions: "Prepositions",
+  word_order: "Word order",
+  pluralization: "Pluralization",
+  vocabulary_misuse: "Vocabulary misuse",
+  agreement: "Subject-verb agreement",
+  other: "Other",
+};
 
 function SectionLabel({
   icon: Icon,
   children,
 }: {
-  icon: LucideIcon;
+  icon: React.ComponentType<{ className?: string }>;
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
+    <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
       <Icon className="h-3.5 w-3.5 opacity-70" />
       {children}
     </div>
   );
 }
 
-function LeftSidebar() {
-  const {
-    selectedLanguage,
-    selectedProficiencyLevel,
-    selectedAssistantVoice,
-    selectedTopic,
-    setSelectedLanguage,
-    setSelectedProficiencyLevel,
-    setselectedAssistantVoice,
-    setSelectedTopic,
-    preferenceError,
-    preferencesSaving,
-  } = useAudioStore();
-  const disabled = false;
+export default function LeftSidebar() {
+  const state = useAudioStore();
+  const disabled = state.connectionState !== ConnectionState.DISCONNECTED;
 
-  // Modern input style matching the clean aesthetic
-  const triggerClass = cn(
-    "h-11 w-full justify-between",
-    "text-sm font-medium",
-    disabled && "opacity-50 cursor-not-allowed",
-  );
+  function toggleMistake(category: GrammarCategory) {
+    const selected = state.targetMistakeCategories;
+    if (selected.includes(category)) {
+      state.setTargetMistakeCategories(
+        selected.filter((value) => value !== category),
+      );
+      return;
+    }
+    if (selected.length < 3) {
+      state.setTargetMistakeCategories([...selected, category]);
+    }
+  }
 
   return (
     <aside className="flex h-full w-full flex-col bg-sidebar text-sidebar-foreground">
-      {/* Header */}
-      <SidebarHeader icon={Settings2} title="Configuration" />
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-8">
-        {/* Language */}
+      <SidebarHeader icon={Settings2} title="Practice setup" />
+      <div className="flex-1 space-y-6 overflow-y-auto px-4 py-5">
         <div>
-          <SectionLabel icon={Globe}>Launguage</SectionLabel>
-          <Select value={selectedLanguage} onValueChange={setSelectedLanguage} disabled={disabled}>
-            <SelectTrigger className={triggerClass}>
-              <SelectValue placeholder="Select language" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {AVAILABLE_LANGUAGES.map((lang) => (
-                  <SelectItem key={lang.id} value={lang.code}>
-                    <div className="flex w-full items-center justify-between gap-2">
-                      <span className="text-sm font-medium truncate">
-                        {lang.name}
-                      </span>
-                      <span className="text-xs text-muted-foreground truncate opacity-70">
-                        {lang.region}
-                      </span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+          <SectionLabel icon={Globe}>Language</SectionLabel>
+          <select
+            className={fieldClass}
+            value={state.selectedLanguage}
+            onChange={(event) => state.setSelectedLanguage(event.target.value)}
+            disabled={disabled}
+          >
+            {AVAILABLE_LANGUAGES.map((language) => (
+              <option key={language.code} value={language.code}>
+                {language.name} · {language.region}
+              </option>
+            ))}
+          </select>
         </div>
 
-        {/* Proficiency */}
         <div>
-          <SectionLabel icon={GraduationCap}>Skill Level</SectionLabel>
-          <Select value={selectedProficiencyLevel} onValueChange={setSelectedProficiencyLevel} disabled={disabled}>
-            <SelectTrigger className={triggerClass}>
-              <SelectValue placeholder="Select level" />
-            </SelectTrigger>
-            <SelectContent>
-              {AVAILABLE_PROFICIENCY_LEVELS.map((level) => (
-                <SelectItem key={level.id} value={level.label}>
-                  <div className="flex flex-col items-start py-0.5">
-                    <span className="text-sm font-medium">{level.label}</span>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SectionLabel icon={GraduationCap}>Skill level</SectionLabel>
+          <select
+            className={fieldClass}
+            value={state.selectedProficiencyLevel}
+            onChange={(event) =>
+              state.setSelectedProficiencyLevel(event.target.value)
+            }
+            disabled={disabled}
+          >
+            {AVAILABLE_PROFICIENCY_LEVELS.map((level) => (
+              <option key={level.id} value={level.label}>
+                {level.label}
+              </option>
+            ))}
+          </select>
         </div>
 
-        {/* Topic */}
         <div>
-          <SectionLabel icon={MessageSquare}>Conversation Topic</SectionLabel>
-          <Select value={selectedTopic} onValueChange={setSelectedTopic} disabled={disabled}>
-            <SelectTrigger className={triggerClass}>
-              <SelectValue placeholder="Select topic" />
-            </SelectTrigger>
-            <SelectContent>
-              {AVAILABLE_TOPICS.map((topic) => (
-                <SelectItem key={topic} value={topic}>
-                  <span className="text-sm">{topic}</span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SectionLabel icon={Sparkles}>Practice mode</SectionLabel>
+          <select
+            className={fieldClass}
+            value={state.practiceMode}
+            onChange={(event) =>
+              state.setPracticeMode(event.target.value as PracticeMode)
+            }
+            disabled={disabled}
+          >
+            <option value="conversation">Conversation</option>
+            <option value="roleplay">Roleplay</option>
+            <option value="mistakes">Practice my mistakes</option>
+            <option value="custom">Custom practice</option>
+          </select>
         </div>
 
-        {/* Voice */}
         <div>
-          <SectionLabel icon={Mic}>AI Voice Persona</SectionLabel>
-          <Select value={selectedAssistantVoice} onValueChange={setselectedAssistantVoice} disabled={disabled}>
-            <SelectTrigger className={triggerClass}>
-              <SelectValue placeholder="Select voice" />
-            </SelectTrigger>
-            <SelectContent>
-              {AVAILABLE_VOICES.map((voice) => (
-                <SelectItem key={voice.id} value={voice.name}>
-                  <div className="flex items-center justify-between w-full gap-4">
-                    <span className="font-medium">{voice.name}</span>
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
-                      {voice.category}
-                    </span>
-                  </div>
-                </SelectItem>
+          <SectionLabel icon={MessageSquare}>Topic</SectionLabel>
+          <input
+            className={fieldClass}
+            list="talk-tutor-topic-suggestions"
+            value={state.selectedTopic}
+            onChange={(event) => state.setSelectedTopic(event.target.value)}
+            maxLength={120}
+            disabled={disabled}
+            placeholder="Type any topic"
+          />
+          <datalist id="talk-tutor-topic-suggestions">
+            {AVAILABLE_TOPICS.map((topic) => (
+              <option key={topic} value={topic} />
+            ))}
+          </datalist>
+        </div>
+
+        {state.practiceMode === "roleplay" && (
+          <div>
+            <SectionLabel icon={UsersRound}>Roleplay</SectionLabel>
+            <select
+              className={fieldClass}
+              value={state.scenarioId}
+              onChange={(event) => state.applyScenario(event.target.value)}
+              disabled={disabled}
+            >
+              <option value="">Custom roleplay</option>
+              {PRACTICE_SCENARIOS.map((scenario) => (
+                <option key={scenario.id} value={scenario.id}>
+                  {scenario.title}
+                </option>
               ))}
-            </SelectContent>
-          </Select>
+            </select>
+            <textarea
+              className={fieldClass + " min-h-24 py-2"}
+              value={state.customScenario}
+              onChange={(event) => state.setCustomScenario(event.target.value)}
+              maxLength={600}
+              disabled={disabled}
+              placeholder="Describe the situation"
+            />
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <input
+                className={fieldClass}
+                value={state.learnerRole}
+                onChange={(event) => state.setLearnerRole(event.target.value)}
+                maxLength={80}
+                disabled={disabled}
+                placeholder="Your role"
+              />
+              <input
+                className={fieldClass}
+                value={state.tutorRole}
+                onChange={(event) => state.setTutorRole(event.target.value)}
+                maxLength={80}
+                disabled={disabled}
+                placeholder="Tutor role"
+              />
+            </div>
+          </div>
+        )}
+
+        {state.practiceMode === "custom" && (
+          <div>
+            <SectionLabel icon={UsersRound}>Custom situation</SectionLabel>
+            <textarea
+              className={fieldClass + " min-h-24 py-2"}
+              value={state.customScenario}
+              onChange={(event) => state.setCustomScenario(event.target.value)}
+              maxLength={600}
+              disabled={disabled}
+              placeholder="Describe what you want to practice"
+            />
+          </div>
+        )}
+
+        {state.practiceMode === "mistakes" && (
+          <div>
+            <SectionLabel icon={Target}>Target weaknesses</SectionLabel>
+            <p className="mb-2 text-[11px] leading-4 text-muted-foreground">
+              Choose up to three. Recent recurring mistakes are preselected.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {GRAMMAR_CATEGORIES.map((category) => {
+                const active = state.targetMistakeCategories.includes(category);
+                return (
+                  <button
+                    key={category}
+                    type="button"
+                    onClick={() => toggleMistake(category)}
+                    disabled={
+                      disabled ||
+                      (!active && state.targetMistakeCategories.length >= 3)
+                    }
+                    aria-pressed={active}
+                    className={
+                      active
+                        ? "rounded-lg bg-primary px-2.5 py-1.5 text-[11px] font-medium text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        : "rounded-lg border border-border px-2.5 py-1.5 text-[11px] text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+                    }
+                  >
+                    {mistakeLabels[category]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-2">
+          <label className="text-xs text-muted-foreground">
+            Corrections
+            <select
+              className={fieldClass}
+              value={state.correctionFrequency}
+              onChange={(event) =>
+                state.setCorrectionFrequency(
+                  event.target.value as CorrectionFrequency,
+                )
+              }
+              disabled={disabled}
+            >
+              <option value="minimal">Minimal</option>
+              <option value="balanced">Balanced</option>
+              <option value="frequent">Frequent</option>
+            </select>
+          </label>
+          <label className="text-xs text-muted-foreground">
+            Difficulty
+            <select
+              className={fieldClass}
+              value={state.difficulty}
+              onChange={(event) =>
+                state.setDifficulty(
+                  event.target.value as ConversationDifficulty,
+                )
+              }
+              disabled={disabled}
+            >
+              <option value="easy">Easy</option>
+              <option value="normal">Normal</option>
+              <option value="challenging">Challenging</option>
+            </select>
+          </label>
+        </div>
+
+        <div>
+          <SectionLabel icon={Mic}>AI voice</SectionLabel>
+          <select
+            className={fieldClass}
+            value={state.selectedAssistantVoice}
+            onChange={(event) =>
+              state.setselectedAssistantVoice(event.target.value)
+            }
+            disabled={disabled}
+          >
+            {AVAILABLE_VOICES.map((voice) => (
+              <option key={voice.id} value={voice.name}>
+                {voice.name} · {voice.category}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {/* Footer */}
       <div className="flex-none border-t bg-background p-4">
-        {(preferencesSaving || preferenceError) && (
-          <div className={`mb-3 text-[11px] leading-4 ${preferenceError ? "text-destructive" : "text-muted-foreground"}`} aria-live="polite">
-            {preferenceError ?? "Saving tutor preference…"}
+        {(state.preferencesSaving || state.preferenceError) && (
+          <div
+            className={
+              state.preferenceError
+                ? "mb-3 text-[11px] text-destructive"
+                : "mb-3 text-[11px] text-muted-foreground"
+            }
+            aria-live="polite"
+          >
+            {state.preferenceError ?? "Saving tutor preference…"}
           </div>
+        )}
+        {disabled && (
+          <p className="mb-3 text-[11px] text-muted-foreground">
+            End the current session to change practice configuration.
+          </p>
         )}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
@@ -178,5 +328,3 @@ function LeftSidebar() {
     </aside>
   );
 }
-
-export default LeftSidebar;
