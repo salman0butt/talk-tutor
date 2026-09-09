@@ -1,4 +1,6 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
+import { FeedbackService } from "@/lib/learning/feedback/service";
+import { GeminiFeedbackProvider } from "@/lib/learning/feedback/provider";
 import { LearningAuthenticationError, requireLearningRepository } from "@/lib/learning/server";
 import { isUuid } from "@/lib/learning/validation";
 
@@ -14,6 +16,22 @@ export async function PATCH(
   try {
     const repository = await requireLearningRepository();
     const session = await repository.finalizeSession(sessionId);
+
+    if (session.feedbackStatus === "pending") {
+      after(async () => {
+        try {
+          const service = new FeedbackService(
+            repository,
+            new GeminiFeedbackProvider(),
+          );
+          await service.generate(sessionId);
+        } catch {
+          // Feedback failures are persisted as status=failed by the service.
+          // The completed session remains valid and reviewable.
+        }
+      });
+    }
+
     return NextResponse.json({ session });
   } catch (error) {
     if (error instanceof LearningAuthenticationError) {
