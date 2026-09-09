@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - feat/personalized-learning-vocabulary
+      - fix/tutor-live-voice-transcript
   pull_request:
     branches:
       - main
+      - feat/personalized-learning-vocabulary
 
 permissions:
   contents: read
