@@ -6,6 +6,8 @@ import {
   buildFeedbackPrompt,
   prepareFeedbackTranscript,
   groundSessionFeedback,
+  parseFeedbackProviderJson,
+  FeedbackGenerationError,
 } from '../../lib/learning/feedback/service.ts';
 
 const validFeedback = {
@@ -221,4 +223,51 @@ test('feedback transcript is bounded while preserving newest turns in order', ()
   for (let index = 1; index < prepared.length; index += 1) {
     assert.ok(prepared[index - 1].sequence < prepared[index].sequence);
   }
+});
+
+
+test('feedback provider JSON parser accepts raw JSON and fenced JSON', () => {
+  assert.deepEqual(
+    parseFeedbackProviderJson(JSON.stringify({ ok: true })),
+    { ok: true },
+  );
+  assert.deepEqual(
+    parseFeedbackProviderJson(````json
+{"ok":true}
+````),
+    { ok: true },
+  );
+});
+
+test('feedback provider JSON parser classifies malformed JSON', () => {
+  assert.throws(
+    () => parseFeedbackProviderJson('not-json'),
+    (error) =>
+      error instanceof FeedbackGenerationError &&
+      error.code === 'invalid_json',
+  );
+});
+
+test('feedback service classifies provider timeouts without losing failed status', async () => {
+  const { repository, calls } = makeRepository();
+  const provider = {
+    async generate() {
+      const error = new Error('Request timed out after 60000ms');
+      error.status = 504;
+      throw error;
+    },
+  };
+  const service = new FeedbackService(repository, provider);
+
+  await assert.rejects(
+    service.generate('550e8400-e29b-41d4-a716-446655440000'),
+    (error) =>
+      error instanceof FeedbackGenerationError &&
+      error.code === 'provider_timeout',
+  );
+  assert.deepEqual(calls.at(-1), [
+    'setFeedbackStatus',
+    '550e8400-e29b-41d4-a716-446655440000',
+    'failed',
+  ]);
 });
