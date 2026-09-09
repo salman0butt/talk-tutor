@@ -347,7 +347,6 @@ export function applyTranscriptEvent(
           inputInterimText: event.finished
             ? ""
             : state.inputInterimText,
-          inputActivityStartedAt: state.inputActivityStartedAt ?? event.at,
         },
         "user",
         visibleInputText(state, inputCommittedText),
