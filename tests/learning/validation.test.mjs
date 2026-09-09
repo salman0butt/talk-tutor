@@ -59,6 +59,7 @@ test('final transcript validation accepts finalized non-empty turns only', () =>
 const validFeedback = {
   summary: 'You communicated clearly and kept the conversation moving.',
   grammarCorrections: [{
+    sourceSequence: 0,
     original: 'I have went yesterday.',
     corrected: 'I went yesterday.',
     explanation: 'Use the simple past with a completed time expression.',
@@ -83,6 +84,15 @@ test('structured feedback validation rejects malformed or incomplete model outpu
   assert.throws(() => parseSessionFeedback({ summary: 'Only summary' }));
   assert.throws(() => parseSessionFeedback({ ...validFeedback, fluency: { score: 140, summary: 'nope' } }), /score/i);
   assert.throws(() => parseSessionFeedback({ ...validFeedback, grammarCorrections: [{ ...validFeedback.grammarCorrections[0], category: 'made_up' }] }), /category/i);
+  const { sourceSequence: _sourceSequence, ...withoutEvidence } =
+    validFeedback.grammarCorrections[0];
+  assert.throws(
+    () => parseSessionFeedback({
+      ...validFeedback,
+      grammarCorrections: [withoutEvidence],
+    }),
+    /sourceSequence/i,
+  );
 });
 
 test('text-only feedback strips pronunciation claims', () => {
