@@ -20,6 +20,8 @@ export interface TranscriptState {
   inputInterimText: string;
   outputText: string;
   inputActivityActive: boolean;
+  inputActivityStartedAt: number | null;
+  releasedMessageIds: string[];
 }
 
 export type TranscriptEvent =
@@ -58,6 +60,8 @@ export function createTranscriptState(sessionId: string): TranscriptState {
     inputInterimText: "",
     outputText: "",
     inputActivityActive: false,
+    inputActivityStartedAt: null,
+    releasedMessageIds: [],
   };
 }
 
@@ -74,28 +78,26 @@ function insertStreamingMessage(
   speaker: TranscriptSpeaker,
   text: string,
   at: number,
-) {
+): TranscriptState {
   const id = `${state.sessionId}-${speaker}-${state.nextMessageNumber}`;
+  const startedAt =
+    speaker === "user" ? state.inputActivityStartedAt ?? at : at;
   const message: TranscriptMessage = {
     id,
     speaker,
     text,
     status: "streaming",
-    startedAt: at,
+    startedAt,
   };
   const messages = [...state.messages];
+  const insertionIndex = messages.findIndex(
+    (candidate) => candidate.startedAt > startedAt,
+  );
 
-  if (speaker === "user" && state.outputMessageId) {
-    const assistantIndex = messages.findIndex(
-      (candidate) => candidate.id === state.outputMessageId,
-    );
-    if (assistantIndex !== -1) {
-      messages.splice(assistantIndex, 0, message);
-    } else {
-      messages.push(message);
-    }
-  } else {
+  if (insertionIndex === -1) {
     messages.push(message);
+  } else {
+    messages.splice(insertionIndex, 0, message);
   }
 
   return {
@@ -167,16 +169,16 @@ function removeStreamingMessage(
   };
 }
 
-function finalizeSpeaker(
+function completeSpeaker(
   state: TranscriptState,
   speaker: TranscriptSpeaker,
   at: number,
-): TranscriptTransition {
+): TranscriptState {
   const idField = messageIdField(speaker);
   const messageId = state[idField];
 
   if (!messageId) {
-    return { state, completed: [] };
+    return state;
   }
 
   const messages = [...state.messages];
@@ -187,11 +189,8 @@ function finalizeSpeaker(
 
   if (index === -1) {
     return {
-      state: {
-        ...state,
-        [idField]: null,
-      },
-      completed: [],
+      ...state,
+      [idField]: null,
     };
   }
 
@@ -199,51 +198,71 @@ function finalizeSpeaker(
   if (!text) {
     messages.splice(index, 1);
     return {
-      state: {
-        ...state,
-        messages,
-        [idField]: null,
-      },
-      completed: [],
+      ...state,
+      messages,
+      [idField]: null,
     };
   }
 
-  const completedMessage: TranscriptMessage = {
+  messages[index] = {
     ...messages[index],
     text,
     status: "complete",
     completedAt: at,
   };
-  messages[index] = completedMessage;
 
-  const nextState: TranscriptState =
-    speaker === "user"
-      ? {
-          ...state,
-          messages,
-          inputMessageId: null,
-          inputCommittedText: "",
-          inputInterimText: "",
-        }
-      : {
-          ...state,
-          messages,
-          outputMessageId: null,
-          outputText: "",
-        };
+  if (speaker === "user") {
+    return {
+      ...state,
+      messages,
+      inputMessageId: null,
+      inputCommittedText: "",
+      inputInterimText: "",
+      inputActivityStartedAt: null,
+    };
+  }
 
   return {
-    state: nextState,
-    completed: [completedMessage],
+    ...state,
+    messages,
+    outputMessageId: null,
+    outputText: "",
   };
 }
 
-function finalizeInput(state: TranscriptState, at: number) {
-  return finalizeSpeaker(state, "user", at);
-}
+function releaseReadyMessages(state: TranscriptState): TranscriptTransition {
+  const released = new Set(state.releasedMessageIds);
+  const completed: TranscriptMessage[] = [];
+  const unresolvedInputReservation =
+    state.inputActivityStartedAt !== null && !state.inputMessageId
+      ? state.inputActivityStartedAt
+      : null;
 
-function finalizeOutput(state: TranscriptState, at: number) {
-  return finalizeSpeaker(state, "assistant", at);
+  for (const message of state.messages) {
+    if (
+      unresolvedInputReservation !== null &&
+      unresolvedInputReservation <= message.startedAt
+    ) {
+      break;
+    }
+
+    if (message.status !== "complete") {
+      break;
+    }
+
+    if (!released.has(message.id)) {
+      released.add(message.id);
+      completed.push(message);
+    }
+  }
+
+  return {
+    state: {
+      ...state,
+      releasedMessageIds: [...released],
+    },
+    completed,
+  };
 }
 
 function visibleInputText(state: TranscriptState, committedText: string) {
@@ -260,47 +279,44 @@ export function applyTranscriptEvent(
   state: TranscriptState,
   event: TranscriptEvent,
 ): TranscriptTransition {
+  let nextState = state;
+
   switch (event.type) {
     case "input-activity-start":
-      return {
-        state: {
-          ...state,
-          inputActivityActive: true,
-        },
-        completed: [],
+      nextState = {
+        ...state,
+        inputActivityActive: true,
+        inputActivityStartedAt: state.inputActivityStartedAt ?? event.at,
       };
+      break;
 
     case "input-activity-end":
-      return {
-        state: {
-          ...state,
-          inputActivityActive: false,
-        },
-        completed: [],
+      nextState = {
+        ...state,
+        inputActivityActive: false,
       };
+      break;
 
     case "input-interim": {
       if (!hasMeaningfulText(event.text)) {
         return { state, completed: [] };
       }
 
-      return {
-        state: upsertStreamingMessage(
-          {
-            ...state,
-            inputInterimText: event.text,
-          },
-          "user",
-          event.text,
-          event.at,
-        ),
-        completed: [],
-      };
+      nextState = upsertStreamingMessage(
+        {
+          ...state,
+          inputInterimText: event.text,
+          inputActivityStartedAt: state.inputActivityStartedAt ?? event.at,
+        },
+        "user",
+        event.text,
+        event.at,
+      );
+      break;
     }
 
     case "input-transcription": {
-      const inputCommittedText =
-        state.inputCommittedText + event.text;
+      const inputCommittedText = state.inputCommittedText + event.text;
 
       if (
         !hasMeaningfulText(inputCommittedText) &&
@@ -309,36 +325,33 @@ export function applyTranscriptEvent(
         return { state, completed: [] };
       }
 
-      const nextState = upsertStreamingMessage(
+      nextState = upsertStreamingMessage(
         {
           ...state,
           inputCommittedText,
           inputInterimText: event.finished
             ? ""
             : state.inputInterimText,
+          inputActivityStartedAt: state.inputActivityStartedAt ?? event.at,
         },
         "user",
         visibleInputText(state, inputCommittedText),
         event.at,
       );
 
-      if (!event.finished) {
-        return {
-          state: nextState,
-          completed: [],
-        };
+      if (event.finished) {
+        nextState = upsertStreamingMessage(
+          {
+            ...nextState,
+            inputInterimText: "",
+          },
+          "user",
+          inputCommittedText,
+          event.at,
+        );
+        nextState = completeSpeaker(nextState, "user", event.at);
       }
-
-      const committedVisibleState = upsertStreamingMessage(
-        {
-          ...nextState,
-          inputInterimText: "",
-        },
-        "user",
-        inputCommittedText,
-        event.at,
-      );
-      return finalizeInput(committedVisibleState, event.at);
+      break;
     }
 
     case "output-transcription": {
@@ -348,7 +361,7 @@ export function applyTranscriptEvent(
         return { state, completed: [] };
       }
 
-      const nextState = upsertStreamingMessage(
+      nextState = upsertStreamingMessage(
         {
           ...state,
           outputText,
@@ -358,57 +371,43 @@ export function applyTranscriptEvent(
         event.at,
       );
 
-      return event.finished
-        ? finalizeOutput(nextState, event.at)
-        : { state: nextState, completed: [] };
+      if (event.finished) {
+        nextState = completeSpeaker(nextState, "assistant", event.at);
+      }
+      break;
     }
 
-    case "turn-complete": {
-      const inputTransition = state.inputActivityActive
-        ? { state, completed: [] as TranscriptMessage[] }
-        : finalizeInput(state, event.at);
-      const outputTransition = finalizeOutput(
-        inputTransition.state,
-        event.at,
-      );
-      return {
-        state: outputTransition.state,
-        completed: [
-          ...inputTransition.completed,
-          ...outputTransition.completed,
-        ],
-      };
-    }
+    case "turn-complete":
+      nextState = state.inputActivityActive
+        ? state
+        : completeSpeaker(state, "user", event.at);
+      nextState = completeSpeaker(nextState, "assistant", event.at);
+      break;
 
     case "interrupted":
-      return finalizeOutput(state, event.at);
+      nextState = completeSpeaker(state, "assistant", event.at);
+      break;
 
-    case "session-end": {
-      let inputState = state;
-      let completed: TranscriptMessage[] = [];
-
+    case "session-end":
       if (hasMeaningfulText(state.inputCommittedText)) {
-        const inputTransition = finalizeInput(inputState, event.at);
-        inputState = inputTransition.state;
-        completed = inputTransition.completed;
+        nextState = completeSpeaker(state, "user", event.at);
       } else {
-        inputState = removeStreamingMessage(inputState, "user");
-        inputState = {
-          ...inputState,
+        nextState = removeStreamingMessage(state, "user");
+        nextState = {
+          ...nextState,
           inputCommittedText: "",
           inputInterimText: "",
-          inputActivityActive: false,
         };
       }
 
-      const outputTransition = finalizeOutput(inputState, event.at);
-      return {
-        state: {
-          ...outputTransition.state,
-          inputActivityActive: false,
-        },
-        completed: [...completed, ...outputTransition.completed],
+      nextState = completeSpeaker(nextState, "assistant", event.at);
+      nextState = {
+        ...nextState,
+        inputActivityActive: false,
+        inputActivityStartedAt: null,
       };
-    }
+      break;
   }
+
+  return releaseReadyMessages(nextState);
 }
