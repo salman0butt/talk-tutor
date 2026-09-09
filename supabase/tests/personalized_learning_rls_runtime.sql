@@ -75,6 +75,38 @@ begin
 end
 $$;
 
+select public.start_learning_session(
+  'en-US',
+  'Intermediate',
+  'Software engineering interview',
+  'Aoede',
+  '[{"role":"user","text":"Tell me about the role.","sequence":0,"occurredAt":"2026-09-09T12:00:00Z"}]'::jsonb,
+  'roleplay',
+  'job-interview',
+  'A technical job interview.',
+  'Candidate',
+  'Hiring manager',
+  array['articles','verb_tense']::text[],
+  'frequent',
+  'challenging'
+);
+
+do $
+begin
+  if not exists (
+    select 1
+    from public.learning_sessions
+    where user_id = '11111111-1111-4111-8111-111111111111'
+      and practice_mode = 'roleplay'
+      and correction_frequency = 'frequent'
+      and conversation_difficulty = 'challenging'
+      and target_mistake_categories = array['articles','verb_tense']::text[]
+  ) then
+    raise exception 'Personalized practice metadata was not persisted';
+  end if;
+end
+$;
+
 reset role;
 set role authenticated;
 set request.jwt.claim.sub = '22222222-2222-4222-8222-222222222222';
