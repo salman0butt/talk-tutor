@@ -96,18 +96,26 @@ function insertStreamingMessage(
     (candidate) => candidate.startedAt > startedAt,
   );
 
-  if (
-    speaker === "user" &&
-    state.inputActivityStartedAt === null &&
-    state.outputMessageId
-  ) {
-    const streamingAssistantIndex = messages.findIndex(
-      (candidate) =>
-        candidate.id === state.outputMessageId &&
-        candidate.status === "streaming",
-    );
-    if (streamingAssistantIndex !== -1) {
-      insertionIndex = streamingAssistantIndex;
+  if (speaker === "user" && state.inputActivityStartedAt === null) {
+    if (state.pendingInputBoundary) {
+      const released = new Set(state.releasedMessageIds);
+      const pendingAssistantIndex = messages.findIndex(
+        (candidate) =>
+          candidate.speaker === "assistant" &&
+          !released.has(candidate.id),
+      );
+      if (pendingAssistantIndex !== -1) {
+        insertionIndex = pendingAssistantIndex;
+      }
+    } else if (state.outputMessageId) {
+      const streamingAssistantIndex = messages.findIndex(
+        (candidate) =>
+          candidate.id === state.outputMessageId &&
+          candidate.status === "streaming",
+      );
+      if (streamingAssistantIndex !== -1) {
+        insertionIndex = streamingAssistantIndex;
+      }
     }
   }
 
@@ -255,11 +263,23 @@ function releaseReadyMessages(state: TranscriptState): TranscriptTransition {
     state.inputActivityStartedAt !== null && !state.inputMessageId
       ? state.inputActivityStartedAt
       : null;
+  const hasImplicitInputReservation =
+    state.pendingInputBoundary &&
+    state.inputActivityStartedAt === null &&
+    !state.inputMessageId;
 
   for (const message of state.messages) {
     if (
       unresolvedInputReservation !== null &&
       unresolvedInputReservation <= message.startedAt
+    ) {
+      break;
+    }
+
+    if (
+      hasImplicitInputReservation &&
+      message.speaker === "assistant" &&
+      !released.has(message.id)
     ) {
       break;
     }
@@ -401,6 +421,10 @@ export function applyTranscriptEvent(
         {
           ...state,
           outputText,
+          pendingInputBoundary:
+            state.pendingInputBoundary ||
+            (!state.inputMessageId &&
+              state.inputActivityStartedAt === null),
         },
         "assistant",
         outputText,
@@ -421,7 +445,9 @@ export function applyTranscriptEvent(
       } else {
         nextState = {
           ...state,
-          pendingInputBoundary: state.inputActivityStartedAt !== null,
+          pendingInputBoundary:
+            state.pendingInputBoundary ||
+            state.inputActivityStartedAt !== null,
         };
       }
       nextState = completeSpeaker(nextState, "assistant", event.at);
