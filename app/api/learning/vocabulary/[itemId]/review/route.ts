@@ -3,10 +3,7 @@ import {
   LearningAuthenticationError,
   requireLearningRepository,
 } from "@/lib/learning/server";
-import {
-  scheduleVocabularyReview,
-  VOCABULARY_REVIEW_RATINGS,
-} from "@/lib/learning/spaced-repetition";
+import { VOCABULARY_REVIEW_RATINGS } from "@/lib/learning/spaced-repetition";
 import { isUuid } from "@/lib/learning/validation";
 
 const RATINGS = new Set<string>(VOCABULARY_REVIEW_RATINGS);
@@ -36,18 +33,8 @@ export async function POST(
       return NextResponse.json({ error: "Vocabulary item not found." }, { status: 404 });
     }
 
-    const next = scheduleVocabularyReview(
-      {
-        easeFactor: item.easeFactor,
-        intervalDays: item.intervalDays,
-        repetitionCount: item.repetitionCount,
-        status: item.status,
-      },
-      rating,
-      new Date(),
-    );
-    await repository.reviewVocabularyItem(itemId, rating, next);
-    return NextResponse.json({ review: next });
+    const review = await repository.reviewVocabularyItem(itemId, rating);
+    return NextResponse.json({ review });
   } catch (error) {
     if (error instanceof LearningAuthenticationError) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
