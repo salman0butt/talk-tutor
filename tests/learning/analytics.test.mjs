@@ -8,6 +8,7 @@ import {
   uniqueVocabularyTerms,
   aggregateCommonMistakes,
   summarizeFluencyTrend,
+  normalizeDashboardSnapshot,
 } from '../../lib/learning/analytics.ts';
 
 function session(endedAt, overrides = {}) {
@@ -136,4 +137,37 @@ test('date-key streak uses already-local practice dates without reinterpreting U
   assert.equal(calculateDateKeyStreak(['2026-09-07', '2026-09-08'], '2026-09-09'), 2);
   assert.equal(calculateDateKeyStreak(['2026-09-07'], '2026-09-09'), 0);
   assert.equal(calculateDateKeyStreak(['2025-12-31', '2026-01-01'], '2026-01-01'), 2);
+});
+
+test('dashboard snapshot normalization rejects malformed metrics without inventing data', () => {
+  assert.deepEqual(
+    normalizeDashboardSnapshot({
+      totalMinutes: '100',
+      completedSessions: -2,
+      sessionsThisWeek: 3,
+      vocabularyLearned: 7,
+      weeklyPractice: [
+        { date: '2026-09-09', minutes: 12 },
+        { date: 'bad-date', minutes: 99 },
+      ],
+      commonMistakes: [
+        { category: 'articles', count: 4 },
+        { category: '', count: 10 },
+      ],
+      recentLanguages: ['en-US', 7],
+      recentScores: [70, 101, '80'],
+      practiceDates: ['2026-09-09', 'not-a-date'],
+    }),
+    {
+      totalMinutes: 0,
+      completedSessions: 0,
+      sessionsThisWeek: 3,
+      vocabularyLearned: 7,
+      weeklyPractice: [{ date: '2026-09-09', minutes: 12 }],
+      commonMistakes: [{ category: 'articles', count: 4 }],
+      recentLanguages: ['en-US'],
+      recentScores: [70],
+      practiceDates: ['2026-09-09'],
+    },
+  );
 });
