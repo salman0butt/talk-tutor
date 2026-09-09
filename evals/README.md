@@ -73,3 +73,20 @@ pronunciation claims.
 - human calibration: before changing educational claims or scoring semantics.
 
 The goal is measurable educational correctness, not a generic AI score.
+
+
+## When to use each tier
+
+| Change | Minimum eval tier |
+| --- | --- |
+| Refactor guardrail code without semantic behavior change | Tier 1 |
+| Add a deterministic rejection/acceptance rule | Tier 1 + new fixture |
+| Change system prompt wording that may affect coaching behavior | Tier 1 + Tier 2 |
+| Change feedback model | Tier 1 + Tier 2 + sampled human review |
+| Change fluency rubric / educational score meaning | Tier 1 + Tier 2 + Tier 3 + Tier 4 |
+| Add a new supported language family/script | Tier 1 multilingual smoke + Tier 2 language quality + sampled human review |
+| Add pronunciation scoring | All tiers, including acoustic evidence and human calibration |
+| Add RAG/tool/agent capability | Tier 1 security/adversarial + task-specific live evals + human review for high-impact actions |
+
+See `docs/architecture/ai-quality-engineering-playbook.md` for the complete
+decision process.

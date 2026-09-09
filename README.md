@@ -52,6 +52,7 @@ See:
 - `docs/architecture/live-conversation.md`
 - `docs/architecture/ai-quality-foundation.md`
 - `docs/architecture/ai-guardrails-evals.md`
+- `docs/architecture/ai-quality-engineering-playbook.md`
 - `docs/security/learning-platform.md`
 - `docs/superpowers/specs/2026-09-09-saas-learning-platform-design.md`
 

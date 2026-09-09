@@ -217,3 +217,15 @@ At minimum it should answer:
 7. What is the rollback condition?
 
 This keeps AI engineering measurable without making the codebase framework-heavy.
+
+
+## Maintainer usage guide
+
+For the detailed **what / why / how / when** decision guide, examples, change
+checklists, model-migration process, retry/fallback rules, RAG/agent decision
+criteria, and production observability triggers, see:
+
+- `docs/architecture/ai-quality-engineering-playbook.md`
+
+Use this document for architecture overview; use the playbook when making an
+actual AI-affecting change.
