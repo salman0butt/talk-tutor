@@ -33,8 +33,8 @@ declare
   v_count integer;
   v_item_id uuid;
 begin
-  select count(*)::integer, min(id)
-  into v_count, v_item_id
+  select count(*)::integer
+  into v_count
   from public.vocabulary_items
   where user_id = '11111111-1111-4111-8111-111111111111'
     and language = 'en-US'
@@ -43,6 +43,13 @@ begin
   if v_count <> 1 then
     raise exception 'Vocabulary save did not deduplicate normalized terms';
   end if;
+
+  select id into v_item_id
+  from public.vocabulary_items
+  where user_id = '11111111-1111-4111-8111-111111111111'
+    and language = 'en-US'
+    and normalized_term = 'departure'
+  limit 1;
 
   perform public.review_vocabulary_item(
     v_item_id,
