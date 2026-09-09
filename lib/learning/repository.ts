@@ -8,6 +8,11 @@ import type {
   SessionStartInput,
 } from "@/lib/learning/types";
 import { normalizeDashboardSnapshot } from "@/lib/learning/analytics";
+import type {
+  SavedVocabularyItem,
+  VocabularyExample,
+  VocabularyOverview,
+} from "@/lib/learning/vocabulary";
 import { ownedSessionFilter, withAuthenticatedOwner } from "@/lib/learning/ownership";
 import { isUuid } from "@/lib/learning/validation";
 import { readSupabaseJson, supabaseRestFetch } from "@/lib/supabase/rest";
@@ -43,6 +48,39 @@ type SessionRow = {
   learner_role?: string | null;
   tutor_role?: string | null;
   target_mistake_categories?: LearningSessionSummary["targetMistakeCategories"];
+};
+
+
+type VocabularyRow = {
+  id: string;
+  term: string;
+  normalized_term: string;
+  language: string;
+  meaning: string;
+  part_of_speech: string | null;
+  example_sentence: string | null;
+  personalized_example: string | null;
+  personalized_explanation: string | null;
+  personalized_example_mistake_category: SavedVocabularyItem["personalizedExampleMistakeCategory"];
+  source_session_id: string | null;
+  source_context: string | null;
+  status: SavedVocabularyItem["status"];
+  ease_factor: number | string;
+  interval_days: number;
+  repetition_count: number;
+  next_review_at: string;
+  last_reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type VocabularyOverviewRow = {
+  saved?: unknown;
+  learning?: unknown;
+  strong?: unknown;
+  due?: unknown;
+  nextDueAt?: unknown;
+  recent?: unknown;
 };
 
 type FeedbackRow = {
@@ -102,6 +140,77 @@ function mapSession(row: SessionRow): LearningSessionSummary {
     tutorRole: row.tutor_role ?? null,
     targetMistakeCategories: row.target_mistake_categories ?? [],
     userMessageCount: 0,
+  };
+}
+
+
+function mapVocabulary(row: VocabularyRow): SavedVocabularyItem {
+  return {
+    id: row.id,
+    term: row.term,
+    normalizedTerm: row.normalized_term,
+    language: row.language,
+    meaning: row.meaning,
+    partOfSpeech: row.part_of_speech,
+    exampleSentence: row.example_sentence,
+    personalizedExample: row.personalized_example,
+    personalizedExplanation: row.personalized_explanation,
+    personalizedExampleMistakeCategory:
+      row.personalized_example_mistake_category,
+    sourceSessionId: row.source_session_id,
+    sourceContext: row.source_context,
+    status: row.status,
+    easeFactor: Number(row.ease_factor),
+    intervalDays: row.interval_days,
+    repetitionCount: row.repetition_count,
+    nextReviewAt: row.next_review_at,
+    lastReviewedAt: row.last_reviewed_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function safeOverviewCount(value: unknown) {
+  return Number.isInteger(value) && Number(value) >= 0 ? Number(value) : 0;
+}
+
+function normalizeVocabularyOverview(input: VocabularyOverviewRow): VocabularyOverview {
+  const recent = Array.isArray(input.recent)
+    ? input.recent
+        .filter((item): item is Record<string, unknown> =>
+          Boolean(item && typeof item === "object" && !Array.isArray(item)),
+        )
+        .filter(
+          (item) =>
+            typeof item.id === "string" &&
+            typeof item.term === "string" &&
+            typeof item.language === "string" &&
+            typeof item.meaning === "string" &&
+            (item.status === "learning" || item.status === "strong") &&
+            typeof item.nextReviewAt === "string" &&
+            typeof item.createdAt === "string",
+        )
+        .map((item) => ({
+          id: item.id as string,
+          term: item.term as string,
+          language: item.language as string,
+          meaning: item.meaning as string,
+          status: item.status as SavedVocabularyItem["status"],
+          nextReviewAt: item.nextReviewAt as string,
+          createdAt: item.createdAt as string,
+        }))
+    : [];
+
+  return {
+    saved: safeOverviewCount(input.saved),
+    learning: safeOverviewCount(input.learning),
+    strong: safeOverviewCount(input.strong),
+    due: safeOverviewCount(input.due),
+    nextDueAt:
+      typeof input.nextDueAt === "string" && !Number.isNaN(Date.parse(input.nextDueAt))
+        ? input.nextDueAt
+        : null,
+    recent,
   };
 }
 
@@ -361,6 +470,170 @@ export class LearningRepository {
       },
     );
     if (!response.ok) await readSupabaseJson(response);
+  }
+
+
+  async getVocabularyOverview(): Promise<VocabularyOverview> {
+    const response = await supabaseRestFetch(
+      "rpc/get_vocabulary_overview",
+      this.accessToken,
+      { method: "POST", body: "{}" },
+    );
+    const payload = await readSupabaseJson<VocabularyOverviewRow>(response);
+    return normalizeVocabularyOverview(payload ?? {});
+  }
+
+  async listVocabularyItems(limit = 100): Promise<SavedVocabularyItem[]> {
+    const safeLimit = Math.max(1, Math.min(200, Math.floor(limit)));
+    const response = await supabaseRestFetch(
+      `vocabulary_items?select=*&user_id=eq.${this.userId}&order=created_at.desc&limit=${safeLimit}`,
+      this.accessToken,
+    );
+    return (await readSupabaseJson<VocabularyRow[]>(response)).map(mapVocabulary);
+  }
+
+  async listDueVocabulary(limit = 50): Promise<SavedVocabularyItem[]> {
+    const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
+    const now = encodeURIComponent(new Date().toISOString());
+    const response = await supabaseRestFetch(
+      `vocabulary_items?select=*&user_id=eq.${this.userId}&next_review_at=lte.${now}&order=next_review_at.asc,created_at.asc&limit=${safeLimit}`,
+      this.accessToken,
+    );
+    return (await readSupabaseJson<VocabularyRow[]>(response)).map(mapVocabulary);
+  }
+
+  async getVocabularyItem(itemId: string): Promise<SavedVocabularyItem | null> {
+    if (!isUuid(itemId)) return null;
+    const response = await supabaseRestFetch(
+      `vocabulary_items?select=*&id=eq.${itemId}&user_id=eq.${this.userId}&limit=1`,
+      this.accessToken,
+    );
+    const rows = await readSupabaseJson<VocabularyRow[]>(response);
+    return rows[0] ? mapVocabulary(rows[0]) : null;
+  }
+
+  async saveVocabularyItem(input: {
+    term: string;
+    language: string;
+    meaning: string;
+    partOfSpeech?: string | null;
+    exampleSentence?: string | null;
+    sourceSessionId?: string | null;
+    sourceContext?: string | null;
+  }): Promise<string> {
+    const response = await supabaseRestFetch(
+      "rpc/save_vocabulary_item",
+      this.accessToken,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          p_term: input.term,
+          p_language: input.language,
+          p_meaning: input.meaning,
+          p_part_of_speech: input.partOfSpeech ?? null,
+          p_example_sentence: input.exampleSentence ?? null,
+          p_source_session_id: input.sourceSessionId ?? null,
+          p_source_context: input.sourceContext ?? null,
+        }),
+      },
+    );
+    const id = await readSupabaseJson<string>(response);
+    if (!isUuid(id)) throw new Error("Vocabulary save returned an invalid id.");
+    return id;
+  }
+
+  async deleteVocabularyItem(itemId: string): Promise<void> {
+    if (!isUuid(itemId)) throw new Error("Invalid vocabulary item id.");
+    const response = await supabaseRestFetch(
+      `vocabulary_items?id=eq.${itemId}&user_id=eq.${this.userId}`,
+      this.accessToken,
+      { method: "DELETE", prefer: "return=minimal" },
+    );
+    if (!response.ok) await readSupabaseJson(response);
+  }
+
+  async reviewVocabularyItem(
+    itemId: string,
+    rating: string,
+    next: {
+      easeFactor: number;
+      intervalDays: number;
+      repetitionCount: number;
+      status: string;
+      nextReviewAt: string;
+      lastReviewedAt: string;
+    },
+  ): Promise<unknown> {
+    if (!isUuid(itemId)) throw new Error("Invalid vocabulary item id.");
+    const response = await supabaseRestFetch(
+      "rpc/review_vocabulary_item",
+      this.accessToken,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          p_item_id: itemId,
+          p_rating: rating,
+          p_ease_factor: next.easeFactor,
+          p_interval_days: next.intervalDays,
+          p_repetition_count: next.repetitionCount,
+          p_status: next.status,
+          p_next_review_at: next.nextReviewAt,
+          p_reviewed_at: next.lastReviewedAt,
+        }),
+      },
+    );
+    return readSupabaseJson(response);
+  }
+
+  async saveVocabularyExample(
+    itemId: string,
+    example: VocabularyExample,
+  ): Promise<void> {
+    if (!isUuid(itemId)) throw new Error("Invalid vocabulary item id.");
+    const response = await supabaseRestFetch(
+      `vocabulary_items?id=eq.${itemId}&user_id=eq.${this.userId}&personalized_example=is.null`,
+      this.accessToken,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          personalized_example: example.sentence,
+          personalized_explanation: example.explanation ?? null,
+          personalized_example_mistake_category:
+            example.targetMistakeCategory ?? null,
+          updated_at: new Date().toISOString(),
+        }),
+        prefer: "return=minimal",
+      },
+    );
+    if (!response.ok) await readSupabaseJson(response);
+  }
+
+  async getRecentMistakeContext(): Promise<{
+    category: SessionFeedback["grammarCorrections"][number]["category"];
+    original: string;
+    corrected: string;
+  } | null> {
+    const response = await supabaseRestFetch(
+      `session_feedback?select=grammar_corrections,created_at&user_id=eq.${this.userId}&order=created_at.desc&limit=12`,
+      this.accessToken,
+    );
+    const rows = await readSupabaseJson<
+      Array<{
+        grammar_corrections: SessionFeedback["grammarCorrections"];
+        created_at: string;
+      }>
+    >(response);
+    for (const row of rows) {
+      const correction = row.grammar_corrections?.[0];
+      if (correction) {
+        return {
+          category: correction.category,
+          original: correction.original,
+          corrected: correction.corrected,
+        };
+      }
+    }
+    return null;
   }
 
   async getDashboardSnapshot(): Promise<DashboardSnapshot> {
