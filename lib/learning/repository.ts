@@ -43,6 +43,8 @@ type SessionRow = {
   status: LearningSessionSummary["status"];
   feedback_status: LearningSessionSummary["feedbackStatus"];
   practice_mode?: LearningSessionSummary["practiceMode"];
+  correction_frequency?: LearningSessionSummary["correctionFrequency"];
+  conversation_difficulty?: LearningSessionSummary["conversationDifficulty"];
   scenario_id?: string | null;
   custom_scenario?: string | null;
   learner_role?: string | null;
@@ -134,6 +136,8 @@ function mapSession(row: SessionRow): LearningSessionSummary {
     status: row.status,
     feedbackStatus: row.feedback_status,
     practiceMode: row.practice_mode,
+    correctionFrequency: row.correction_frequency,
+    conversationDifficulty: row.conversation_difficulty,
     scenarioId: row.scenario_id ?? null,
     customScenario: row.custom_scenario ?? null,
     learnerRole: row.learner_role ?? null,
@@ -312,6 +316,8 @@ export class LearningRepository {
         p_learner_role: input.learnerRole ?? null,
         p_tutor_role: input.tutorRole ?? null,
         p_target_mistake_categories: input.targetMistakeCategories,
+        p_correction_frequency: input.correctionFrequency,
+        p_conversation_difficulty: input.difficulty,
       }),
     });
     const id = await readSupabaseJson<string>(response);
@@ -347,7 +353,7 @@ export class LearningRepository {
   async listSessions(limit = 30): Promise<LearningSessionSummary[]> {
     const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
     const response = await supabaseRestFetch(
-      `learning_sessions?select=id,language,proficiency_level,topic,assistant_voice,started_at,ended_at,duration_seconds,status,feedback_status,practice_mode,scenario_id,custom_scenario,learner_role,tutor_role,target_mistake_categories&user_id=eq.${this.userId}&status=eq.completed&order=ended_at.desc.nullslast&limit=${safeLimit}`,
+      `learning_sessions?select=id,language,proficiency_level,topic,assistant_voice,started_at,ended_at,duration_seconds,status,feedback_status,practice_mode,correction_frequency,conversation_difficulty,scenario_id,custom_scenario,learner_role,tutor_role,target_mistake_categories&user_id=eq.${this.userId}&status=eq.completed&order=ended_at.desc.nullslast&limit=${safeLimit}`,
       this.accessToken,
     );
     const rows = await readSupabaseJson<SessionRow[]>(response);
@@ -383,7 +389,7 @@ export class LearningRepository {
   async getSession(sessionId: string): Promise<LearningSessionSummary | null> {
     const filter = ownedSessionFilter(this.userId, sessionId);
     const response = await supabaseRestFetch(
-      `learning_sessions?select=id,language,proficiency_level,topic,assistant_voice,started_at,ended_at,duration_seconds,status,feedback_status,practice_mode,scenario_id,custom_scenario,learner_role,tutor_role,target_mistake_categories&${new URLSearchParams(filter).toString()}&limit=1`,
+      `learning_sessions?select=id,language,proficiency_level,topic,assistant_voice,started_at,ended_at,duration_seconds,status,feedback_status,practice_mode,correction_frequency,conversation_difficulty,scenario_id,custom_scenario,learner_role,tutor_role,target_mistake_categories&${new URLSearchParams(filter).toString()}&limit=1`,
       this.accessToken,
     );
     const rows = await readSupabaseJson<SessionRow[]>(response);
