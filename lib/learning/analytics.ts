@@ -168,3 +168,23 @@ export function normalizeDashboardSnapshot(input: unknown): DashboardSnapshot {
     practiceDates,
   };
 }
+
+
+export function buildWeeklyPracticeSeries(
+  entries: Array<{ date: string; minutes: number }>,
+  todayKey: string,
+  days = 7,
+) {
+  const safeDays = Math.max(1, Math.min(31, Math.floor(days)));
+  const byDate = new Map(entries.map((entry) => [entry.date, Math.max(0, entry.minutes)]));
+  const dates: string[] = [todayKey];
+
+  while (dates.length < safeDays) {
+    dates.unshift(previousDateKey(dates[0]));
+  }
+
+  return dates.map((date) => ({
+    date,
+    minutes: byDate.get(date) ?? 0,
+  }));
+}
