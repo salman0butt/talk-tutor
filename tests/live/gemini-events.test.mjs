@@ -73,3 +73,43 @@ test('returns empty normalized content when serverContent is absent', () => {
     interactionInProgress: false,
   });
 });
+
+
+test('preserves transcription finished flags from the installed SDK', () => {
+  const result = normalizeGeminiMessage(
+    {
+      serverContent: {
+        inputTranscription: { text: 'final user words', finished: true },
+        outputTranscription: { text: 'final tutor words', finished: true },
+      },
+    },
+    500,
+  );
+
+  assert.deepEqual(result.transcriptEvents, [
+    { type: 'input-transcription', text: 'final user words', finished: true, at: 500 },
+    { type: 'output-transcription', text: 'final tutor words', finished: true, at: 500 },
+  ]);
+});
+
+test('normalizes user voice activity so model turn boundaries cannot close a new utterance', () => {
+  const start = normalizeGeminiMessage(
+    {
+      voiceActivity: { voiceActivityType: 'ACTIVITY_START' },
+    },
+    700,
+  );
+  const end = normalizeGeminiMessage(
+    {
+      voiceActivity: { voiceActivityType: 'ACTIVITY_END' },
+    },
+    800,
+  );
+
+  assert.deepEqual(start.transcriptEvents, [
+    { type: 'input-activity-start', at: 700 },
+  ]);
+  assert.deepEqual(end.transcriptEvents, [
+    { type: 'input-activity-end', at: 800 },
+  ]);
+});
