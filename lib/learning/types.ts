@@ -20,6 +20,9 @@ export const GRAMMAR_CATEGORIES = [
 
 export type LearningGoal = (typeof LEARNING_GOALS)[number];
 export type GrammarCategory = (typeof GRAMMAR_CATEGORIES)[number];
+export type CorrectionFrequency = "minimal" | "balanced" | "frequent";
+export type ConversationDifficulty = "easy" | "normal" | "challenging";
+export type PracticeMode = "conversation" | "roleplay" | "mistakes" | "custom";
 export type TranscriptRole = "user" | "assistant";
 export type SessionStatus = "active" | "completed" | "abandoned";
 export type FeedbackStatus =
@@ -37,6 +40,8 @@ export interface LearningProfile {
   learningGoal: LearningGoal;
   dailyPracticeTargetMinutes: number;
   timezone: string;
+  correctionFrequency: CorrectionFrequency;
+  conversationDifficulty: ConversationDifficulty;
   createdAt: string;
   updatedAt: string;
 }
@@ -48,6 +53,8 @@ export interface LearningProfilePatch {
   learningGoal?: LearningGoal;
   dailyPracticeTargetMinutes?: number;
   timezone?: string;
+  correctionFrequency?: CorrectionFrequency;
+  conversationDifficulty?: ConversationDifficulty;
 }
 
 export interface FinalTranscriptMessage {
@@ -97,6 +104,12 @@ export interface LearningSessionSummary {
   durationSeconds: number;
   status: SessionStatus;
   feedbackStatus: FeedbackStatus;
+  practiceMode?: PracticeMode;
+  scenarioId?: string | null;
+  customScenario?: string | null;
+  learnerRole?: string | null;
+  tutorRole?: string | null;
+  targetMistakeCategories?: GrammarCategory[];
   userMessageCount: number;
   feedbackSummary?: string | null;
   fluencyScore?: number | null;
@@ -104,14 +117,30 @@ export interface LearningSessionSummary {
 
 export interface DashboardSnapshot {
   totalMinutes: number;
+  thisWeekMinutes: number;
+  thisMonthMinutes: number;
+  previousWeekMinutes: number;
+  minutesToday: number;
   completedSessions: number;
   sessionsThisWeek: number;
   vocabularyLearned: number;
+  vocabularySaved: number;
+  vocabularyLearning: number;
+  vocabularyStrong: number;
+  vocabularyDue: number;
+  newVocabularyThisWeek: number;
   weeklyPractice: Array<{ date: string; minutes: number }>;
-  commonMistakes: Array<{ category: string; count: number }>;
+  commonMistakes: Array<{
+    category: string;
+    count: number;
+    affectedSessions: number;
+    recentCount: number;
+    previousCount: number;
+  }>;
   recentLanguages: string[];
   recentScores: number[];
   practiceDates: string[];
+  vocabularyGrowth: Array<{ date: string; count: number }>;
 }
 
 export interface SessionStartInput {
@@ -119,5 +148,13 @@ export interface SessionStartInput {
   proficiencyLevel: string;
   topic: string;
   assistantVoice: string;
+  practiceMode: PracticeMode;
+  scenarioId?: string;
+  customScenario?: string;
+  learnerRole?: string;
+  tutorRole?: string;
+  correctionFrequency: CorrectionFrequency;
+  difficulty: ConversationDifficulty;
+  targetMistakeCategories: GrammarCategory[];
   messages: FinalTranscriptMessage[];
 }
