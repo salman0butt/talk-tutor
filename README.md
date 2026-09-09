@@ -30,6 +30,13 @@ Talk Tutor is a voice-first AI language-learning SaaS built with Next.js, React,
 - Weekly practice visualization
 - Vocabulary growth and common-mistake analytics
 - Premium authenticated dashboard
+- Personalized conversation, roleplay, custom-topic, and Practice My Mistakes modes
+- Persistent correction-frequency and conversation-difficulty defaults
+- Learner-owned vocabulary library with save-from-feedback
+- Deterministic simplified SM-2 flashcard review
+- Due/learning/strong vocabulary states
+- On-demand persisted personalized vocabulary examples
+- Deterministic recommended-practice suggestions
 
 Talk Tutor does **not** store audio recordings in this version. Session review is transcript-based, and the application does not claim pronunciation accuracy from text transcripts.
 
@@ -59,8 +66,10 @@ It creates:
 - `learning_sessions`
 - `session_messages`
 - `session_feedback`
+- `vocabulary_items`
+- `vocabulary_reviews`
 
-It also installs ownership-safe session/dashboard RPCs, constraints, indexes, RLS, grants, and policies.
+The prerequisite migration installs the persistent session platform. The personalized-learning migration is `supabase/migrations/20260909090000_personalized_learning_vocabulary.sql`; it extends profiles/sessions and adds vocabulary tables, indexes, RLS, and ownership-safe vocabulary/review RPCs.
 
 Apply the migration to the **Talk Tutor Supabase project** before using Dashboard, History, Profile, or persistent Tutor sessions.
 
@@ -200,3 +209,14 @@ To add ElevenLabs conversation components separately if needed:
 ```bash
 pnpm dlx @elevenlabs/cli@latest components add conversation
 ```
+
+
+## Personalized learning milestone
+
+The current personalized-learning layer adds real progress periods, current/longest streaks, defensible mistake trends, sufficient-sample skill trends, roleplay/custom/mistake-targeted practice, saved vocabulary, flashcards, simplified SM-2 review scheduling, and on-demand personalized vocabulary examples.
+
+See `docs/architecture/personalized-learning-vocabulary.md` for exact metric definitions, practice configuration behavior, vocabulary states, review scheduling, AI cost boundaries, and security design.
+
+The Tutor treats correction frequency and difficulty as per-session overrides. Saved defaults are managed from Profile. Custom topics, scenarios, roles, transcript-derived mistakes, and vocabulary context are untrusted prompt data.
+
+The review schedule is enforced atomically in PostgreSQL from only the owned card ID and review rating; the browser cannot submit authoritative interval/ease/status values.
