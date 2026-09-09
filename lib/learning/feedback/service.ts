@@ -78,10 +78,13 @@ export function buildFeedbackPrompt(input: {
 }
 
 export class FeedbackService {
-  constructor(
-    private readonly repository: FeedbackRepository,
-    private readonly provider: FeedbackProvider,
-  ) {}
+  private readonly repository: FeedbackRepository;
+  private readonly provider: FeedbackProvider;
+
+  constructor(repository: FeedbackRepository, provider: FeedbackProvider) {
+    this.repository = repository;
+    this.provider = provider;
+  }
 
   async generate(sessionId: string): Promise<{
     status: "completed" | "skipped" | "already_processing";
