@@ -139,3 +139,16 @@ GitHub Actions starts disposable PostgreSQL and:
 This is schema-level validation only.
 
 A final deployment should still verify two real Supabase users against the correctly configured Talk Tutor project because CI cannot prove hosted Supabase Auth/PostgREST integration without project credentials.
+
+
+## Personalized learning and vocabulary
+
+The personalized-learning migration enables RLS on `vocabulary_items` and `vocabulary_reviews`, revokes anonymous table/RPC access, and uses `auth.uid()` as the ownership source.
+
+A composite `(vocabulary_item_id, user_id)` foreign key prevents cross-owner review insertion. Source sessions use a same-owner composite foreign key so an owned vocabulary record cannot claim another learner's session as provenance.
+
+Vocabulary review state is not accepted from the browser. The review RPC locks the current learner's item and computes ease, repetitions, interval, status, and timestamps in PostgreSQL from the rating.
+
+Custom practice topics, scenarios, roles, historical corrections, source contexts, and transcripts are untrusted model inputs. Gemini Live and personalized-example prompts put these values in clearly marked data blocks beneath fixed system policy. Model output used for personalized examples is structured and validated locally before persistence.
+
+CI applies both migrations to disposable PostgreSQL and runs two-user RLS/runtime assertions. This does not replace deployment verification against the actual Talk Tutor Supabase project.
