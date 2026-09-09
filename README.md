@@ -378,6 +378,63 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 `GEMINI_FEEDBACK_MODEL` is optional. When omitted, feedback uses `gemini-2.5-flash`.
 
+For local development, prefer keeping all local values in `.env.local` rather
+than defining the same variable in several env files.
+
+Next.js resolves server environment values in this order during development:
+
+1. an already-exported shell/process variable;
+2. `.env.development.local`;
+3. `.env.local`;
+4. `.env.development`;
+5. `.env`.
+
+That means a blank value in `.env.local` can shadow a valid value in `.env`.
+
+If the application says `GEMINI_API_KEY is not configured` even though the
+key exists in `.env`, first stop the development server and check where the
+variable is defined without printing the secret:
+
+```bash
+for f in .env.development.local .env.local .env.development .env; do
+  [ -f "$f" ] && awk -F= '/^GEMINI_API_KEY=/{print FILENAME ": value length=" length(substr($0,index($0,"=")+1))}' "$f"
+done
+```
+
+A reported length of `0` means that file contains a blank override.
+
+Also check whether the current shell already exports the variable:
+
+```bash
+if [ "${GEMINI_API_KEY+x}" = x ]; then
+  echo "shell GEMINI_API_KEY is set; length=${#GEMINI_API_KEY}"
+else
+  echo "shell GEMINI_API_KEY is not set"
+fi
+```
+
+If the shell variable is present but blank or stale:
+
+```bash
+unset GEMINI_API_KEY
+```
+
+The simplest local setup is then to keep one non-empty definition in
+`.env.local`:
+
+```env
+GEMINI_API_KEY=your_key_here
+```
+
+After changing any server-side environment variable, fully stop and restart
+Next.js:
+
+```bash
+pnpm dev
+```
+
+Do not paste or log the actual Gemini key while troubleshooting.
+
 #### Supabase variables
 
 `NEXT_PUBLIC_SUPABASE_URL` is the project URL.

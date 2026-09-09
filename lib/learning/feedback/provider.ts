@@ -113,7 +113,11 @@ export class GeminiFeedbackProvider implements FeedbackProvider {
     prompt: string;
   }): Promise<string> {
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
+    if (!apiKey) {
+      throw new Error(
+        "GEMINI_API_KEY is not available to the Next.js server. Check for a blank override in .env.local/.env.development.local or the shell environment, then restart the dev server.",
+      );
+    }
 
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
