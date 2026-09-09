@@ -106,3 +106,46 @@ export function parseVocabularyExample(input: unknown): VocabularyExample {
       : {}),
   };
 }
+
+
+export type VocabularyLearningStatus = "learning" | "strong";
+
+export interface SavedVocabularyItem {
+  id: string;
+  term: string;
+  normalizedTerm: string;
+  language: string;
+  meaning: string;
+  partOfSpeech: string | null;
+  exampleSentence: string | null;
+  personalizedExample: string | null;
+  personalizedExplanation: string | null;
+  personalizedExampleMistakeCategory: GrammarCategory | null;
+  sourceSessionId: string | null;
+  sourceContext: string | null;
+  status: VocabularyLearningStatus;
+  easeFactor: number;
+  intervalDays: number;
+  repetitionCount: number;
+  nextReviewAt: string;
+  lastReviewedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VocabularyOverview {
+  saved: number;
+  learning: number;
+  strong: number;
+  due: number;
+  nextDueAt: string | null;
+  recent: Array<{
+    id: string;
+    term: string;
+    language: string;
+    meaning: string;
+    status: VocabularyLearningStatus;
+    nextReviewAt: string;
+    createdAt: string;
+  }>;
+}
