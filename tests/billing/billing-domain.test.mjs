@@ -111,3 +111,117 @@ test('exact or exceeded allowance blocks a new tutor session', () => {
   assert.equal(exact.remainingSeconds, 0);
   assert.equal(exact.canStartTutor, false);
 });
+
+
+test('Stripe subscription snapshots map only configured application prices', async () => {
+  const { mapStripeSubscriptionSnapshot } = await import('../../lib/billing/stripe-events.ts');
+  const subscription = {
+    id: 'sub_123',
+    customer: 'cus_123',
+    status: 'active',
+    current_period_start: 1788825600,
+    current_period_end: 1791417600,
+    cancel_at_period_end: true,
+    metadata: { userId: '11111111-1111-4111-8111-111111111111' },
+    items: { data: [{ price: { id: 'price_starter' } }] },
+  };
+  assert.deepEqual(
+    mapStripeSubscriptionSnapshot(subscription, {
+      starter: 'price_starter',
+      pro: 'price_pro',
+    }),
+    {
+      stripeCustomerId: 'cus_123',
+      stripeSubscriptionId: 'sub_123',
+      planId: 'starter',
+      status: 'active',
+      currentPeriodStart: '2026-09-08T00:00:00.000Z',
+      currentPeriodEnd: '2026-10-08T00:00:00.000Z',
+      cancelAtPeriodEnd: true,
+      metadataUserId: '11111111-1111-4111-8111-111111111111',
+    },
+  );
+  assert.equal(
+    mapStripeSubscriptionSnapshot(
+      {
+        ...subscription,
+        items: { data: [{ price: { id: 'price_unknown' } }] },
+      },
+      { starter: 'price_starter', pro: 'price_pro' },
+    ),
+    null,
+  );
+});
+
+test('Stripe event filter accepts only subscription synchronization events', async () => {
+  const { isRelevantStripeEventType } = await import('../../lib/billing/stripe-events.ts');
+  for (const type of [
+    'checkout.session.completed',
+    'customer.subscription.created',
+    'customer.subscription.updated',
+    'customer.subscription.deleted',
+  ]) {
+    assert.equal(isRelevantStripeEventType(type), true, type);
+  }
+  assert.equal(isRelevantStripeEventType('invoice.payment_succeeded'), false);
+  assert.equal(isRelevantStripeEventType('charge.succeeded'), false);
+});
+
+test('Stripe webhook signature verification checks timestamp, payload and tolerance', async () => {
+  const { createHmac } = await import('node:crypto');
+  const { verifyStripeWebhookSignature } = await import('../../lib/billing/stripe-events.ts');
+  const payload = '{"id":"evt_123","type":"customer.subscription.updated"}';
+  const secret = 'whsec_test';
+  const timestamp = 1788940000;
+  const digest = createHmac('sha256', secret)
+    .update(`${timestamp}.${payload}`, 'utf8')
+    .digest('hex');
+  const header = `t=${timestamp},v1=${digest}`;
+
+  assert.equal(
+    verifyStripeWebhookSignature(payload, header, secret, timestamp + 30),
+    true,
+  );
+  assert.equal(
+    verifyStripeWebhookSignature(payload + 'x', header, secret, timestamp + 30),
+    false,
+  );
+  assert.equal(
+    verifyStripeWebhookSignature(payload, header, secret, timestamp + 600),
+    false,
+  );
+});
+
+test('tutor token policy caps a session at remaining entitlement and rejects exhaustion', async () => {
+  const { buildTutorTokenPolicy } = await import('../../lib/billing/token-policy.ts');
+
+  assert.deepEqual(
+    buildTutorTokenPolicy({ remainingSeconds: 0 }),
+    {
+      allowed: false,
+      maxSessionSeconds: 0,
+      warningAtSeconds: 0,
+      reason: 'usage_limit',
+    },
+  );
+
+  assert.deepEqual(
+    buildTutorTokenPolicy({ remainingSeconds: 300 }),
+    {
+      allowed: true,
+      maxSessionSeconds: 300,
+      warningAtSeconds: 180,
+      reason: 'usage_limit',
+    },
+  );
+
+  assert.deepEqual(
+    buildTutorTokenPolicy({ remainingSeconds: 3600 }),
+    {
+      allowed: true,
+      maxSessionSeconds: 600,
+      warningAtSeconds: 480,
+      reason: 'provider_limit',
+    },
+  );
+});

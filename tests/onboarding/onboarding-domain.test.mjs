@@ -79,3 +79,41 @@ test('recommendations map goal and estimated level to deterministic practice con
   assert.equal(immigration.practiceMode, 'custom');
   assert.match(immigration.topic, /appointment|daily life|government/i);
 });
+
+
+test('onboarding submission is server-scored and validates learner override', async () => {
+  const { parseOnboardingSubmission } = await import('../../lib/onboarding/submission.ts');
+  const allCorrect = Object.fromEntries(
+    PLACEMENT_QUESTIONS.map((question) => [question.id, question.correctOptionId]),
+  );
+
+  const parsed = parseOnboardingSubmission({
+    goal: 'immigration',
+    answers: allCorrect,
+    selectedLevel: 'Intermediate',
+  });
+
+  assert.equal(parsed.goal, 'immigration');
+  assert.equal(parsed.score, 6);
+  assert.equal(parsed.recommendedLevel, 'Top Class');
+  assert.equal(parsed.selectedLevel, 'Intermediate');
+  assert.equal(parsed.recommendation.difficulty, 'normal');
+  assert.equal(parsed.recommendation.practiceMode, 'custom');
+
+  assert.throws(
+    () => parseOnboardingSubmission({
+      goal: 'general_fluency',
+      answers: allCorrect,
+      selectedLevel: 'Intermediate',
+    }),
+    /goal/i,
+  );
+  assert.throws(
+    () => parseOnboardingSubmission({
+      goal: 'travel',
+      answers: allCorrect,
+      selectedLevel: 'Expert',
+    }),
+    /level/i,
+  );
+});
