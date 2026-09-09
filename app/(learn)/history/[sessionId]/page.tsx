@@ -71,6 +71,7 @@ export default async function SessionReviewPage({
           feedback={feedback}
           status={session.feedbackStatus}
           sessionId={session.id}
+          language={session.language}
         />
       </div>
 
