@@ -10,6 +10,10 @@ alter table public.profiles
 alter table public.learning_sessions
   add column practice_mode text not null default 'conversation'
     check (practice_mode in ('conversation','roleplay','mistakes','custom')),
+  add column correction_frequency text not null default 'balanced'
+    check (correction_frequency in ('minimal','balanced','frequent')),
+  add column conversation_difficulty text not null default 'normal'
+    check (conversation_difficulty in ('easy','normal','challenging')),
   add column scenario_id text
     check (scenario_id is null or char_length(btrim(scenario_id)) between 1 and 64),
   add column custom_scenario text
@@ -351,7 +355,9 @@ create or replace function public.start_learning_session(
   p_custom_scenario text,
   p_learner_role text,
   p_tutor_role text,
-  p_target_mistake_categories text[]
+  p_target_mistake_categories text[],
+  p_correction_frequency text,
+  p_conversation_difficulty text
 )
 returns uuid
 language plpgsql
@@ -370,6 +376,8 @@ begin
   if char_length(btrim(coalesce(p_topic, ''))) < 1
      or char_length(btrim(p_topic)) > 120
      or p_practice_mode not in ('conversation','roleplay','mistakes','custom')
+     or p_correction_frequency not in ('minimal','balanced','frequent')
+     or p_conversation_difficulty not in ('easy','normal','challenging')
      or cardinality(coalesce(p_target_mistake_categories, '{}'::text[])) > 3
      or not (
        coalesce(p_target_mistake_categories, '{}'::text[]) <@ array[
@@ -400,6 +408,8 @@ begin
     assistant_voice,
     feedback_status,
     practice_mode,
+    correction_frequency,
+    conversation_difficulty,
     scenario_id,
     custom_scenario,
     learner_role,
@@ -414,6 +424,8 @@ begin
     p_assistant_voice,
     'not_requested',
     p_practice_mode,
+    p_correction_frequency,
+    p_conversation_difficulty,
     nullif(btrim(p_scenario_id), ''),
     nullif(btrim(p_custom_scenario), ''),
     nullif(btrim(p_learner_role), ''),
@@ -627,9 +639,9 @@ $$;
 revoke all on function public.save_vocabulary_item(text,text,text,text,text,uuid,text) from public, anon;
 revoke all on function public.review_vocabulary_item(uuid,text,numeric,integer,integer,text,timestamptz,timestamptz) from public, anon;
 revoke all on function public.get_vocabulary_overview() from public, anon;
-revoke all on function public.start_learning_session(text,text,text,text,jsonb,text,text,text,text,text,text[]) from public, anon;
+revoke all on function public.start_learning_session(text,text,text,text,jsonb,text,text,text,text,text,text[],text,text) from public, anon;
 
 grant execute on function public.save_vocabulary_item(text,text,text,text,text,uuid,text) to authenticated;
 grant execute on function public.review_vocabulary_item(uuid,text,numeric,integer,integer,text,timestamptz,timestamptz) to authenticated;
 grant execute on function public.get_vocabulary_overview() to authenticated;
-grant execute on function public.start_learning_session(text,text,text,text,jsonb,text,text,text,text,text,text[]) to authenticated;
+grant execute on function public.start_learning_session(text,text,text,text,jsonb,text,text,text,text,text,text[],text,text) to authenticated;
