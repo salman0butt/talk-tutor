@@ -1,19 +1,76 @@
 # Talk Tutor
 
-Talk Tutor is a real-time AI language speaking tutor built with Next.js, React, Gemini Live audio, and Supabase Auth.
+Talk Tutor is a voice-first AI language-learning SaaS built with Next.js, React, Gemini Live, Supabase Auth, Postgres, and Row Level Security.
 
-## What is included
+## Product capabilities
 
-- Public SaaS landing page
+### Public and authentication
+
+- Responsive SaaS landing page
 - Email/password signup and sign in
-- Email confirmation callback
-- Forgot-password and reset-password flows
-- HttpOnly authentication cookies
-- Protected `/tutor` workspace
+- Email confirmation
+- Forgot/reset password
+- HttpOnly access and refresh cookies
 - Protected Gemini ephemeral-token endpoint
-- Real-time language conversation interface
-- Language, topic, proficiency, and voice selection
-- Live transcript and audio visualization
+
+### Persistent learning platform
+
+- Authenticated learner profile
+- Persistent language, proficiency, and tutor-voice preferences
+- Learning goal, daily practice target, and IANA timezone
+- Real-time Gemini voice conversation
+- Structured finalized transcript persistence
+- Session history and educational session review
+- Structured post-session Gemini feedback
+- Grammar corrections with stable mistake categories
+- Better sentence suggestions
+- Vocabulary extracted from conversations
+- Text-derived fluency coaching summary and score
+- Timezone-aware practice streak
+- Weekly practice visualization
+- Vocabulary growth and common-mistake analytics
+- Premium authenticated dashboard
+
+Talk Tutor does **not** store audio recordings in this version. Session review is transcript-based, and the application does not claim pronunciation accuracy from text transcripts.
+
+## Architecture
+
+The application keeps the authentication model introduced in the SaaS auth layer: Supabase Auth REST endpoints issue sessions that are stored in secure HttpOnly cookies.
+
+Persistent learner data is accessed server-side through Supabase PostgREST using the authenticated user's access token. A service-role key is not required. PostgreSQL Row Level Security remains the ownership boundary even if an application query is implemented incorrectly.
+
+See:
+
+- `docs/architecture/learning-platform.md`
+- `docs/security/learning-platform.md`
+- `docs/superpowers/specs/2026-09-09-saas-learning-platform-design.md`
+
+## Database schema
+
+The learning-platform migration is:
+
+```text
+supabase/migrations/20260909000000_learning_platform.sql
+```
+
+It creates:
+
+- `profiles`
+- `learning_sessions`
+- `session_messages`
+- `session_feedback`
+
+It also installs ownership-safe session/dashboard RPCs, constraints, indexes, RLS, grants, and policies.
+
+Apply the migration to the **Talk Tutor Supabase project** before using Dashboard, History, Profile, or persistent Tutor sessions.
+
+For example with a linked Supabase CLI project:
+
+```bash
+supabase db push
+```
+
+Do not apply this migration to an unrelated Supabase project.
 
 ## Local setup
 
@@ -29,24 +86,31 @@ pnpm install
 cp .env.example .env.local
 ```
 
-3. Set `GEMINI_API_KEY`.
-
-4. Create a Supabase project and enable Email authentication.
-
-5. Add your Supabase project URL and anon/publishable key:
+3. Configure:
 
 ```env
+GEMINI_API_KEY=YOUR_GEMINI_KEY
+GEMINI_FEEDBACK_MODEL=gemini-2.5-flash
+
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_ANON_KEY
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_ANON_OR_PUBLISHABLE_KEY
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-6. In Supabase Authentication URL Configuration, add these redirect URLs for local development:
+`GEMINI_FEEDBACK_MODEL` is optional; it defaults to `gemini-2.5-flash`.
+
+No Supabase service-role key is needed.
+
+4. Enable Supabase Email authentication.
+
+5. Add the local Auth redirect URLs:
 
 - `http://localhost:3000/auth/callback`
 - `http://localhost:3000/auth/reset-password`
 
-Add the equivalent production URLs before deploying.
+Add the corresponding production URLs before deploying.
+
+6. Apply the database migration.
 
 7. Start the app:
 
@@ -54,11 +118,80 @@ Add the equivalent production URLs before deploying.
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open `http://localhost:3000`.
 
-## Authentication flow
+## Session lifecycle
 
-The app uses Supabase Auth's REST endpoints directly, so no extra authentication package is required. Successful sessions are stored in secure HttpOnly cookies. The tutor route validates the current user server-side before rendering, and `/api/token` validates the same session before minting a Gemini ephemeral token.
+A database session is deliberately **not** created when somebody merely opens or connects to the Tutor.
+
+```text
+Connect to Gemini Live
+      ↓
+Receive partial transcript → UI only
+      ↓
+First finalized user turn
+      ↓
+Atomically create learning session + buffered finalized turns
+      ↓
+Persist subsequent finalized turns in order
+      ↓
+Disconnect / unexpected close
+      ↓
+Idempotently finalize duration and transcript
+      ↓
+Generate structured feedback after the response
+      ↓
+History + Dashboard reflect persisted data
+```
+
+A completed session counts toward the practice streak only when it contains at least one finalized user message and lasts at least 60 seconds.
+
+## Feedback safety
+
+Conversation transcripts are untrusted user data.
+
+The feedback pipeline:
+
+1. reads only the current user's persisted session through RLS;
+2. limits transcript size;
+3. serializes the transcript as delimited JSON data;
+4. explicitly instructs the model never to follow transcript instructions;
+5. requests structured JSON output;
+6. validates that JSON again locally;
+7. strips pronunciation observations because the current evidence is text-only;
+8. persists feedback only after validation.
+
+A provider or validation failure marks feedback as failed without invalidating the completed session. The user can retry feedback from session review.
+
+## Progress analytics
+
+Current metrics are intentionally conservative:
+
+- total completed practice minutes
+- completed sessions
+- sessions this week
+- meaningful-session practice streak
+- unique normalized vocabulary terms
+- recurring structured grammar categories
+- weekly practice minutes
+- recent text-derived fluency coaching trend
+
+The fluency value is a coaching signal based on a stable transcript rubric. It is not an acoustic score, standardized exam score, or scientific proficiency grade.
+
+## Development verification
+
+Run:
+
+```bash
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+GitHub Actions additionally starts a disposable PostgreSQL 17 instance, applies the migration against a minimal Supabase-compatible auth stub, and verifies core RLS/policy/grant/ownership metadata.
+
+That CI database check proves migration parsing and expected security objects. It does **not** replace a final integration test against the correctly configured Talk Tutor Supabase project.
 
 ## Existing audio components
 
