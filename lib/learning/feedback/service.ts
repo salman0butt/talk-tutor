@@ -1,4 +1,4 @@
-import type { FinalTranscriptMessage, SessionFeedback } from "@/lib/learning/types";
+import type { FeedbackStatus, FinalTranscriptMessage, SessionFeedback } from "@/lib/learning/types";
 import { parseSessionFeedback } from "@/lib/learning/validation";
 
 const MAX_FEEDBACK_TURNS = 80;
@@ -18,7 +18,7 @@ export interface FeedbackRepository {
   getMessages(sessionId: string): Promise<FinalTranscriptMessage[]>;
   claimFeedbackGeneration(sessionId: string): Promise<boolean>;
   saveFeedback(sessionId: string, feedback: SessionFeedback): Promise<void>;
-  setFeedbackStatus(sessionId: string, status: string): Promise<void>;
+  setFeedbackStatus(sessionId: string, status: FeedbackStatus): Promise<void>;
   getFeedback(sessionId: string): Promise<SessionFeedback | null>;
 }
 
