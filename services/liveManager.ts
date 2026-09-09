@@ -28,6 +28,7 @@ export class LiveManager {
     private nextStartTime = 0;
     private sources = new Set<AudioBufferSourceNode>()
     private outputLevelFrame: number | null = null;
+    private cleanupPromise: Promise<void> | null = null;
     private callbacks: LiveManagerCallbacks;
     private isMuted: boolean = false;
     private inputTranscription: string = "";
@@ -75,10 +76,17 @@ export class LiveManager {
                     onmessage: this.handleMessage.bind(this),
                     onerror: () => {
                         this.callbacks.onStateChange(ConnectionState.ERROR);
-                        this.callbacks.onError("Could not connect.")
+                        this.callbacks.onError("Could not connect.");
+                        void this.cleanupResources(true).finally(() => {
+                            this.callbacks.onSessionClosed?.("connection error");
+                        });
                     },
-                    // todo: handle this -> destroy strems, ...
-                    onclose: (e) => console.log("Closed:", e.reason),
+                    onclose: (event) => {
+                        void this.cleanupResources(false).finally(() => {
+                            this.callbacks.onStateChange(ConnectionState.DISCONNECTED);
+                            this.callbacks.onSessionClosed?.(event.reason);
+                        });
+                    },
                 },
             });
 
@@ -161,7 +169,7 @@ export class LiveManager {
 
   generateSystemPrompt(config: ConnectConfig) {
     return `
-    ROLE: You are an expert language tutor, Your name is "TalkWalk".
+    ROLE: You are an expert language tutor. Your name is "Talk Tutor".
 
     GOAL: Help the user improve their proficiency in ${config.selected_launguage_name} (${config.selected_launguage_region}).
     TOPIC: ${config.selected_topic}.
@@ -298,40 +306,66 @@ export class LiveManager {
     }
 
     async disconnect() {
-        this.activeSession?.close();
-        this.activeSession = null;
-
-        if (this.outputLevelFrame !== null) {
-            cancelAnimationFrame(this.outputLevelFrame);
-            this.outputLevelFrame = null;
-        }
-
-        await this.stopAllAudio();
-
-        this.inputSource?.disconnect();
-        this.workletNode?.disconnect();
-        this.mediaStream?.getTracks().forEach((track) => track.stop());
-        this.outputNode?.disconnect();
-        this.outputAnalyser?.disconnect();
-
-        await Promise.all([
-            this.inputAudioContext?.close(),
-            this.outputAudioContext?.close(),
-        ]);
-
-        this.inputSource = null;
-        this.workletNode = null;
-        this.mediaStream = null;
-        this.inputAudioContext = null;
-        this.outputAudioContext = null;
-        this.outputNode = null;
-        this.outputAnalyser = null;
-        this.nextStartTime = 0;
-        this.isMuted = false;
+        await this.cleanupResources(true);
 
         this.callbacks.onAudioLevel(0, "input");
         this.callbacks.onAgentState(null);
         this.callbacks.onStateChange(ConnectionState.DISCONNECTED);
+    }
+
+    private cleanupResources(closeSession: boolean): Promise<void> {
+        if (this.cleanupPromise) return this.cleanupPromise;
+
+        this.cleanupPromise = Promise.resolve()
+            .then(async () => {
+                const session = this.activeSession;
+                this.activeSession = null;
+
+                if (closeSession) {
+                    try {
+                        session?.close();
+                    } catch {
+                        // Session may already be closed by the remote peer.
+                    }
+                }
+
+                if (this.outputLevelFrame !== null) {
+                    cancelAnimationFrame(this.outputLevelFrame);
+                    this.outputLevelFrame = null;
+                }
+
+                await this.stopAllAudio();
+
+                this.inputSource?.disconnect();
+                this.workletNode?.disconnect();
+                this.mediaStream?.getTracks().forEach((track) => track.stop());
+                this.outputNode?.disconnect();
+                this.outputAnalyser?.disconnect();
+
+                await Promise.all([
+                    this.inputAudioContext?.close().catch(() => undefined),
+                    this.outputAudioContext?.close().catch(() => undefined),
+                ]);
+
+                this.inputSource = null;
+                this.workletNode = null;
+                this.mediaStream = null;
+                this.inputAudioContext = null;
+                this.outputAudioContext = null;
+                this.outputNode = null;
+                this.outputAnalyser = null;
+                this.nextStartTime = 0;
+                this.isMuted = false;
+
+                this.callbacks.onAudioLevel(0, "input");
+                this.callbacks.onAudioLevel(0, "output");
+                this.callbacks.onAgentState(null);
+            })
+            .finally(() => {
+                this.cleanupPromise = null;
+            });
+
+        return this.cleanupPromise;
     }
 
     private monitorOutputLevel() {

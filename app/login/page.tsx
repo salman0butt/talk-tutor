@@ -9,7 +9,7 @@ export default async function LoginPage({
   searchParams: Promise<{ next?: string; reset?: string }>;
 }) {
   const [user, params] = await Promise.all([getCurrentUser(), searchParams]);
-  const nextPath = isSafeNextPath(params.next) ? params.next : "/tutor";
+  const nextPath = isSafeNextPath(params.next) ? params.next : "/dashboard";
   const notice =
     params.reset === "success"
       ? "Password updated. Sign in with your new password."

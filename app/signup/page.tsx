@@ -9,7 +9,7 @@ export default async function SignupPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const [user, params] = await Promise.all([getCurrentUser(), searchParams]);
-  const nextPath = isSafeNextPath(params.next) ? params.next : "/tutor";
+  const nextPath = isSafeNextPath(params.next) ? params.next : "/dashboard";
 
   if (user) redirect(nextPath);
 

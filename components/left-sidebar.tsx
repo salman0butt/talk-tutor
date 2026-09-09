@@ -48,7 +48,18 @@ function SectionLabel({
 }
 
 function LeftSidebar() {
-  const { selectedLanguage, selectedProficiencyLevel, selectedAssistantVoice, selectedTopic, setSelectedLanguage, setSelectedProficiencyLevel, setselectedAssistantVoice, setSelectedTopic } = useAudioStore();
+  const {
+    selectedLanguage,
+    selectedProficiencyLevel,
+    selectedAssistantVoice,
+    selectedTopic,
+    setSelectedLanguage,
+    setSelectedProficiencyLevel,
+    setselectedAssistantVoice,
+    setSelectedTopic,
+    preferenceError,
+    preferencesSaving,
+  } = useAudioStore();
   const disabled = false;
 
   // Modern input style matching the clean aesthetic
@@ -151,6 +162,11 @@ function LeftSidebar() {
 
       {/* Footer */}
       <div className="flex-none border-t bg-background p-4">
+        {(preferencesSaving || preferenceError) && (
+          <div className={`mb-3 text-[11px] leading-4 ${preferenceError ? "text-destructive" : "text-muted-foreground"}`} aria-live="polite">
+            {preferenceError ?? "Saving tutor preference…"}
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
             <Palette className="h-3.5 w-3.5" />

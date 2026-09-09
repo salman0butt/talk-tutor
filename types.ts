@@ -30,6 +30,7 @@ export interface LiveManagerCallbacks {
   onAudioLevel: (level: number, type: "input" | "output") => void;
   onAgentState: (state: AgentState) => void;
   onError: (error: string) => void;
+  onSessionClosed?: (reason?: string) => void;
 }
 
 export interface ConnectConfig {
