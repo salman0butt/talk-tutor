@@ -84,6 +84,17 @@ export class LearningSessionRecorder {
     return this.enqueue(async () => {
       if (this.finalized) return;
 
+      if (
+        !this.sessionId &&
+        this.config &&
+        hasFinalUserTurn(this.pending)
+      ) {
+        const batch = normalizePendingTurns(this.pending);
+        this.sessionId = await this.api.createSession(this.config, batch);
+        this.pending = [];
+        this.nextSequence = batch.length;
+      }
+
       if (this.sessionId && this.pending.length > 0) {
         while (this.pending.length > 0) {
           const turn = this.pending[0];
