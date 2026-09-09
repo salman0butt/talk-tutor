@@ -445,3 +445,88 @@ grant execute on function public.acquire_tutor_session_lease(uuid,integer)
   to service_role;
 grant execute on function public.release_tutor_session_lease(uuid,uuid)
   to service_role;
+
+
+-- ---------------------------------------------------------------------------
+-- Feedback-status mutation remains owner-scoped after session hardening
+-- ---------------------------------------------------------------------------
+
+create or replace function public.claim_learning_session_feedback(
+  p_session_id uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_updated integer;
+begin
+  if v_user_id is null then
+    raise exception 'authentication required' using errcode = '42501';
+  end if;
+
+  update public.learning_sessions
+  set
+    feedback_status = 'processing',
+    updated_at = now()
+  where id = p_session_id
+    and user_id = v_user_id
+    and status = 'completed'
+    and feedback_status in ('pending', 'failed');
+
+  get diagnostics v_updated = row_count;
+  return v_updated = 1;
+end;
+$$;
+
+create or replace function public.set_learning_session_feedback_status(
+  p_session_id uuid,
+  p_status text
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_updated integer;
+begin
+  if v_user_id is null then
+    raise exception 'authentication required' using errcode = '42501';
+  end if;
+
+  if p_status not in (
+    'not_requested',
+    'pending',
+    'processing',
+    'completed',
+    'failed'
+  ) then
+    raise exception 'unsupported feedback status' using errcode = '23514';
+  end if;
+
+  update public.learning_sessions
+  set
+    feedback_status = p_status,
+    updated_at = now()
+  where id = p_session_id
+    and user_id = v_user_id
+    and status = 'completed';
+
+  get diagnostics v_updated = row_count;
+  return v_updated = 1;
+end;
+$$;
+
+revoke all on function public.claim_learning_session_feedback(uuid)
+  from public, anon;
+revoke all on function public.set_learning_session_feedback_status(uuid,text)
+  from public, anon;
+
+grant execute on function public.claim_learning_session_feedback(uuid)
+  to authenticated;
+grant execute on function public.set_learning_session_feedback_status(uuid,text)
+  to authenticated;
