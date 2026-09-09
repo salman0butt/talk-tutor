@@ -153,19 +153,26 @@ select public.start_learning_session(
   'Free Chat',
   'Aoede',
   '[{"role":"user","sequence":0,"text":"Hello","occurredAt":"2026-09-09T05:00:00Z"}]'::jsonb
-) as created_session \gset
+);
 
-do $$
+do $
+declare
+  v_owned_sessions integer;
+  v_owned_messages integer;
 begin
-  if not exists (
-    select 1
-    from public.learning_sessions
-    where id = :'created_session'::uuid
-      and user_id = '11111111-1111-4111-8111-111111111111'
-  ) then
+  select count(*)::integer into v_owned_sessions
+  from public.learning_sessions
+  where user_id = '11111111-1111-4111-8111-111111111111';
+
+  select count(*)::integer into v_owned_messages
+  from public.session_messages
+  where user_id = '11111111-1111-4111-8111-111111111111'
+    and text = 'Hello';
+
+  if v_owned_sessions <> 2 or v_owned_messages <> 1 then
     raise exception 'start_learning_session did not derive auth.uid ownership';
   end if;
 end
-$$;
+$;
 
 reset role;
