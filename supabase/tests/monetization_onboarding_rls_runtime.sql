@@ -261,3 +261,60 @@ end
 $$;
 
 reset role;
+
+
+-- Feedback generation remains functional without reopening direct session UPDATE.
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-4111-8111-111111111111';
+
+do $$
+declare
+  v_session_id uuid;
+  v_claimed boolean;
+begin
+  select id into v_session_id
+  from public.learning_sessions
+  where user_id = '11111111-1111-4111-8111-111111111111'
+    and topic = 'Billing-safe practice'
+    and status = 'completed'
+  order by created_at desc
+  limit 1;
+
+  if v_session_id is null then
+    raise exception 'Billing-safe finalized session missing for feedback test';
+  end if;
+
+  v_claimed := public.claim_learning_session_feedback(v_session_id);
+  if not v_claimed then
+    raise exception 'Pending feedback session could not be claimed';
+  end if;
+
+  if public.claim_learning_session_feedback(v_session_id) then
+    raise exception 'Feedback session was claimed twice';
+  end if;
+
+  perform public.set_learning_session_feedback_status(v_session_id, 'failed');
+
+  if not exists (
+    select 1 from public.learning_sessions
+    where id = v_session_id
+      and user_id = '11111111-1111-4111-8111-111111111111'
+      and feedback_status = 'failed'
+  ) then
+    raise exception 'Feedback-status RPC did not persist owner-scoped status';
+  end if;
+
+  begin
+    perform public.set_learning_session_feedback_status(
+      v_session_id,
+      'made_up'
+    );
+    raise exception 'Unsupported feedback status was accepted';
+  exception
+    when check_violation then
+      null;
+  end;
+end
+$$;
+
+reset role;

@@ -184,3 +184,26 @@ begin
   end if;
 end
 $$;
+
+
+do $$
+begin
+  if to_regprocedure('public.claim_learning_session_feedback(uuid)') is null
+     or to_regprocedure('public.set_learning_session_feedback_status(uuid,text)') is null then
+    raise exception 'Feedback-status RPCs are missing after session mutation hardening';
+  end if;
+
+  if not has_function_privilege(
+       'authenticated',
+       'public.claim_learning_session_feedback(uuid)',
+       'execute'
+     )
+     or not has_function_privilege(
+       'authenticated',
+       'public.set_learning_session_feedback_status(uuid,text)',
+       'execute'
+     ) then
+    raise exception 'authenticated role is missing feedback-status RPC access';
+  end if;
+end
+$$;
