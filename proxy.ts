@@ -72,7 +72,9 @@ export const config = {
     "/dashboard/:path*",
     "/history/:path*",
     "/profile/:path*",
-    "/api/token",
+    "/onboarding/:path*",
+    "/api/token/:path*",
     "/api/learning/:path*",
+    "/api/onboarding/:path*",
   ],
 };
