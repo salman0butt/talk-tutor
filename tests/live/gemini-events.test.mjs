@@ -2,13 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeGeminiMessage } from '../../lib/live/gemini-events.ts';
 
-test('normalizes interim, final input, output and turn boundary in provider order', () => {
+test('normalizes interim and finalized transcription signals with SDK finished flags', () => {
   const result = normalizeGeminiMessage(
     {
       serverContent: {
         interimInputTranscription: { text: 'I want' },
-        inputTranscription: { text: 'I want coffee' },
-        outputTranscription: { text: 'Sure.' },
+        inputTranscription: { text: 'I want coffee', finished: true },
+        outputTranscription: { text: 'Sure.', finished: false },
         turnComplete: true,
       },
     },
@@ -17,8 +17,18 @@ test('normalizes interim, final input, output and turn boundary in provider orde
 
   assert.deepEqual(result.transcriptEvents, [
     { type: 'input-interim', text: 'I want', at: 1234 },
-    { type: 'input-final', text: 'I want coffee', at: 1234 },
-    { type: 'output-fragment', text: 'Sure.', at: 1234 },
+    {
+      type: 'input-transcription',
+      text: 'I want coffee',
+      finished: true,
+      at: 1234,
+    },
+    {
+      type: 'output-transcription',
+      text: 'Sure.',
+      finished: false,
+      at: 1234,
+    },
     { type: 'turn-complete', at: 1234 },
   ]);
 });
@@ -29,10 +39,25 @@ test('collects every inline audio part instead of only the first part', () => {
       serverContent: {
         modelTurn: {
           parts: [
-            { inlineData: { data: 'audio-1', mimeType: 'audio/pcm;rate=24000' } },
+            {
+              inlineData: {
+                data: 'audio-1',
+                mimeType: 'audio/pcm;rate=24000',
+              },
+            },
             { text: 'metadata text' },
-            { inlineData: { data: 'audio-2', mimeType: 'audio/pcm;rate=24000' } },
-            { inlineData: { data: 'image', mimeType: 'image/png' } },
+            {
+              inlineData: {
+                data: 'audio-2',
+                mimeType: 'audio/pcm;rate=24000',
+              },
+            },
+            {
+              inlineData: {
+                data: 'image',
+                mimeType: 'image/png',
+              },
+            },
           ],
         },
       },
@@ -43,12 +68,15 @@ test('collects every inline audio part instead of only the first part', () => {
   assert.deepEqual(result.audioChunks, ['audio-1', 'audio-2']);
 });
 
-test('maps interruption before the following transcript boundary', () => {
+test('keeps the last output transcript fragment before interruption and turn completion', () => {
   const result = normalizeGeminiMessage(
     {
       serverContent: {
         interrupted: true,
-        outputTranscription: { text: 'partial reply' },
+        outputTranscription: {
+          text: 'partial reply',
+          finished: false,
+        },
         turnComplete: true,
       },
     },
@@ -56,14 +84,73 @@ test('maps interruption before the following transcript boundary', () => {
   );
 
   assert.deepEqual(result.transcriptEvents, [
-    { type: 'output-fragment', text: 'partial reply', at: 99 },
+    {
+      type: 'output-transcription',
+      text: 'partial reply',
+      finished: false,
+      at: 99,
+    },
     { type: 'interrupted', at: 99 },
     { type: 'turn-complete', at: 99 },
   ]);
   assert.equal(result.interrupted, true);
 });
 
-test('returns empty normalized content when serverContent is absent', () => {
+test('normalizes user activity start before server boundaries so barge-in remains active', () => {
+  const result = normalizeGeminiMessage(
+    {
+      voiceActivity: {
+        voiceActivityType: 'ACTIVITY_START',
+      },
+      serverContent: {
+        turnComplete: true,
+      },
+    },
+    700,
+  );
+
+  assert.deepEqual(result.transcriptEvents, [
+    { type: 'input-activity-start', at: 700 },
+    { type: 'turn-complete', at: 700 },
+  ]);
+});
+
+test('normalizes user activity end after server boundaries to avoid premature fallback finalization', () => {
+  const result = normalizeGeminiMessage(
+    {
+      voiceActivity: {
+        voiceActivityType: 'ACTIVITY_END',
+      },
+      serverContent: {
+        turnComplete: true,
+      },
+    },
+    800,
+  );
+
+  assert.deepEqual(result.transcriptEvents, [
+    { type: 'turn-complete', at: 800 },
+    { type: 'input-activity-end', at: 800 },
+  ]);
+});
+
+test('voice activity is preserved even when serverContent is absent', () => {
+  const start = normalizeGeminiMessage(
+    {
+      voiceActivity: {
+        voiceActivityType: 'ACTIVITY_START',
+      },
+    },
+    900,
+  );
+
+  assert.deepEqual(start.transcriptEvents, [
+    { type: 'input-activity-start', at: 900 },
+  ]);
+  assert.deepEqual(start.audioChunks, []);
+});
+
+test('returns empty normalized content when neither server content nor voice activity is present', () => {
   assert.deepEqual(normalizeGeminiMessage({}, 10), {
     transcriptEvents: [],
     audioChunks: [],
@@ -72,44 +159,4 @@ test('returns empty normalized content when serverContent is absent', () => {
     waitingForInput: false,
     interactionInProgress: false,
   });
-});
-
-
-test('preserves transcription finished flags from the installed SDK', () => {
-  const result = normalizeGeminiMessage(
-    {
-      serverContent: {
-        inputTranscription: { text: 'final user words', finished: true },
-        outputTranscription: { text: 'final tutor words', finished: true },
-      },
-    },
-    500,
-  );
-
-  assert.deepEqual(result.transcriptEvents, [
-    { type: 'input-transcription', text: 'final user words', finished: true, at: 500 },
-    { type: 'output-transcription', text: 'final tutor words', finished: true, at: 500 },
-  ]);
-});
-
-test('normalizes user voice activity so model turn boundaries cannot close a new utterance', () => {
-  const start = normalizeGeminiMessage(
-    {
-      voiceActivity: { voiceActivityType: 'ACTIVITY_START' },
-    },
-    700,
-  );
-  const end = normalizeGeminiMessage(
-    {
-      voiceActivity: { voiceActivityType: 'ACTIVITY_END' },
-    },
-    800,
-  );
-
-  assert.deepEqual(start.transcriptEvents, [
-    { type: 'input-activity-start', at: 700 },
-  ]);
-  assert.deepEqual(end.transcriptEvents, [
-    { type: 'input-activity-end', at: 800 },
-  ]);
 });
