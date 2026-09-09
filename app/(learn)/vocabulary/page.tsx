@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpenCheck, Brain, Clock3, Layers3 } from "lucide-react";
+import { BookOpenCheck, Brain, Clock3, Layers3, type LucideIcon } from "lucide-react";
 import { VocabularyItemCard } from "@/components/vocabulary/vocabulary-item-card";
 import { getVocabularyViewModel } from "@/lib/learning/server";
 
@@ -29,19 +29,19 @@ export default async function VocabularyPage() {
       </div>
 
       <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {[
-          ["Saved", overview.saved, Layers3],
-          ["Due now", overview.due, Clock3],
-          ["Learning", overview.learning, Brain],
-          ["Strong", overview.strong, BookOpenCheck],
-        ].map(([label, value, Icon]) => (
+        {([
+          { label: "Saved", value: overview.saved, icon: Layers3 },
+          { label: "Due now", value: overview.due, icon: Clock3 },
+          { label: "Learning", value: overview.learning, icon: Brain },
+          { label: "Strong", value: overview.strong, icon: BookOpenCheck },
+        ] satisfies Array<{ label: string; value: number; icon: LucideIcon }>).map(({ label, value, icon: Icon }) => (
           <div
-            key={String(label)}
+            key={label}
             className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5"
           >
             <Icon className="h-4 w-4 text-amber-300" />
-            <p className="mt-4 text-2xl font-semibold">{String(value)}</p>
-            <p className="mt-1 text-xs text-white/30">{String(label)}</p>
+            <p className="mt-4 text-2xl font-semibold">{value}</p>
+            <p className="mt-1 text-xs text-white/30">{label}</p>
           </div>
         ))}
       </div>
