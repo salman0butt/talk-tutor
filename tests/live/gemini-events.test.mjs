@@ -56,8 +56,8 @@ test('maps interruption before the following transcript boundary', () => {
   );
 
   assert.deepEqual(result.transcriptEvents, [
-    { type: 'interrupted', at: 99 },
     { type: 'output-fragment', text: 'partial reply', at: 99 },
+    { type: 'interrupted', at: 99 },
     { type: 'turn-complete', at: 99 },
   ]);
   assert.equal(result.interrupted, true);
