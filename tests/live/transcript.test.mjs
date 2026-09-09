@@ -609,3 +609,44 @@ test('next user activity seals a late transcript that arrived after the previous
   assert.equal(nextActivity.state.inputActivityActive, true);
   assert.equal(nextActivity.state.inputActivityStartedAt, 2000);
 });
+
+
+test('late user transcription can precede a completed assistant even without voice-activity events', () => {
+  let state = createTranscriptState('late-no-activity');
+  state = applyTranscriptEvent(state, {
+    type: 'output-transcription',
+    text: 'Assistant answer',
+    finished: true,
+    at: 1000,
+  }).state;
+  state = applyTranscriptEvent(state, {
+    type: 'turn-complete',
+    at: 1010,
+  }).state;
+
+  const lateUser = applyTranscriptEvent(state, {
+    type: 'input-transcription',
+    text: 'User question',
+    finished: true,
+    at: 1020,
+  });
+
+  assert.deepEqual(
+    lateUser.state.messages.map(({ speaker, text, status }) => ({
+      speaker,
+      text,
+      status,
+    })),
+    [
+      { speaker: 'user', text: 'User question', status: 'complete' },
+      { speaker: 'assistant', text: 'Assistant answer', status: 'complete' },
+    ],
+  );
+  assert.deepEqual(
+    lateUser.completed.map(({ speaker, text }) => ({ speaker, text })),
+    [
+      { speaker: 'user', text: 'User question' },
+      { speaker: 'assistant', text: 'Assistant answer' },
+    ],
+  );
+});
