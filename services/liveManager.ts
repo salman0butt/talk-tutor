@@ -6,9 +6,9 @@ import {
 import { buildTutorSystemInstruction } from "@/lib/learning/practice";
 import { base64ToUint8Array, createPCMBlob, decodeAudioData, getAudioLevel } from "@/lib/audioUtils";
 import type { TranscriptEvent } from "@/lib/live/transcript";
+import { normalizeGeminiMessage } from "@/lib/live/gemini-events";
 import {
   GoogleGenAI,
-  InteractionStatus,
   type LiveConnectConfig,
   type LiveServerMessage,
   Modality,
@@ -186,10 +186,12 @@ export class LiveManager {
     });
   }
 
-  handleMessage(message: LiveServerMessage, generation = this.generation) {
+  handleMessage(
+    message: LiveServerMessage,
+    generation = this.generation,
+  ) {
     if (!this.isCurrent(generation)) return;
 
-    const serverContent = message.serverContent;
     const voiceActivity = message.voiceActivity?.voiceActivityType;
 
     if (voiceActivity === VoiceActivityType.ACTIVITY_START) {
@@ -198,66 +200,29 @@ export class LiveManager {
       this.callbacks.onAgentState("thinking");
     }
 
-    if (!serverContent) return;
+    const normalized = normalizeGeminiMessage(message, Date.now());
 
-    const at = Date.now();
-
-    if (serverContent.interrupted) {
+    if (normalized.interrupted) {
       this.resetPlayback();
-      this.emitTranscript({ type: "interrupted", at });
       this.callbacks.onAgentState("listening");
     }
 
-    const interimInput = serverContent.interimInputTranscription?.text;
-    if (interimInput !== undefined) {
-      this.emitTranscript({
-        type: "input-interim",
-        text: interimInput,
-        at,
-      });
+    for (const event of normalized.transcriptEvents) {
+      this.emitTranscript(event);
     }
 
-    const finalInput = serverContent.inputTranscription?.text;
-    if (finalInput !== undefined) {
-      this.emitTranscript({
-        type: "input-final",
-        text: finalInput,
-        at,
-      });
-    }
-
-    const outputText = serverContent.outputTranscription?.text;
-    if (outputText !== undefined) {
-      this.emitTranscript({
-        type: "output-fragment",
-        text: outputText,
-        at,
-      });
-    }
-
-    for (const part of serverContent.modelTurn?.parts ?? []) {
-      const inlineData = part.inlineData;
-      if (
-        inlineData?.data &&
-        (!inlineData.mimeType || inlineData.mimeType.startsWith("audio/"))
-      ) {
+    if (!normalized.interrupted) {
+      for (const audioData of normalized.audioChunks) {
         this.callbacks.onAgentState("talking");
-        this.enqueueAudioChunk(inlineData.data, generation);
+        this.enqueueAudioChunk(audioData, generation);
       }
     }
 
-    if (serverContent.turnComplete) {
-      this.emitTranscript({ type: "turn-complete", at });
-    }
-
-    if (serverContent.turnComplete || serverContent.waitingForInput) {
+    if (normalized.turnComplete || normalized.waitingForInput) {
       if (!this.sources.size) {
         this.callbacks.onAgentState("listening");
       }
-    } else if (
-      serverContent.interactionStatus === InteractionStatus.IN_PROGRESS &&
-      !this.sources.size
-    ) {
+    } else if (normalized.interactionInProgress && !this.sources.size) {
       this.callbacks.onAgentState("thinking");
     }
   }
