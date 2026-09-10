@@ -4,6 +4,8 @@ Talk Tutor is a voice-first language-learning application built around real conv
 
 The application is built with Next.js, React, TypeScript, Gemini Live, Supabase and Stripe. It is designed as a complete SaaS product rather than a standalone voice demo: authentication, onboarding, billing, usage limits, persistence, progress tracking, vocabulary review, AI quality checks and production-oriented security are all part of the same codebase.
 
+![Talk Tutor app screenshot](public/screenshots/talk-tutor-home.png)
+
 ## What the app includes
 
 ### Live speaking practice
